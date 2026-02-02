@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.cupboardly"
+    namespace = "com.seniorproject.cupboardly"
     compileSdk {
         version = release(36)
     }

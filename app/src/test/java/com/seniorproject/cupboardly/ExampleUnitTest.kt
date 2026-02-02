@@ -1,4 +1,4 @@
-package com.example.cupboardly
+package com.seniorproject.cupboardly
 
 import org.junit.Test
 

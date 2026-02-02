@@ -1,7 +1,7 @@
-package com.example.cupboardly.room.dao
+package com.seniorproject.cupboardly.room.dao
 
 import androidx.room.*
-import com.example.cupboardly.room.entity.IngredientEntity
+import com.seniorproject.cupboardly.room.entity.IngredientEntity
 
 @Dao
 interface IngredientDao {

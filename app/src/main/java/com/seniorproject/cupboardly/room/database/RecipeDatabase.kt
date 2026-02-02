@@ -1,11 +1,11 @@
-package com.example.cupboardly.room.database
+package com.seniorproject.cupboardly.room.database
 
 import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import com.example.cupboardly.room.dao.RecipeDao
-import com.example.cupboardly.room.entity.RecipeEntity
+import com.seniorproject.cupboardly.room.dao.RecipeDao
+import com.seniorproject.cupboardly.room.entity.RecipeEntity
 
 @Database(entities = [RecipeEntity::class], version = 1, exportSchema = false)
 abstract class RecipeDatabase : RoomDatabase() {
