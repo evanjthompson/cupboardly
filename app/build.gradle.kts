@@ -56,6 +56,5 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
-    // The annotation processor
     ksp(libs.androidx.room.compiler)
 }
