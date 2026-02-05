@@ -16,18 +16,22 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 
 @Composable
-fun IngredientScreen(viewModel: IngredientViewModel = viewModel()) {
+fun IngredientScreen(
+    viewModel: IngredientViewModel = viewModel(),
+    onGoToRecipes: () -> Unit
+) {
     var ingredients by remember { mutableStateOf(listOf<IngredientEntity>()) }
-    val coroutineScope = rememberCoroutineScope() // Composable coroutine scope
+    val coroutineScope = rememberCoroutineScope()
 
-    // Load ingredients when Composable first appears
     LaunchedEffect(Unit) {
         ingredients = viewModel.getAllIngredients()
     }
 
-    Column(modifier = Modifier
-        .fillMaxSize()
-        .padding(16.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
 
         Button(onClick = {
             coroutineScope.launch {
@@ -40,12 +44,29 @@ fun IngredientScreen(viewModel: IngredientViewModel = viewModel()) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        Button(onClick = onGoToRecipes) {
+            Text("Go to Recipes")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         Text("Ingredients:")
 
-        LazyColumn(modifier = Modifier.fillMaxWidth()) {
+        LazyColumn {
             items(ingredients) { ingredient ->
-                Text(text = ingredient.name)
+                Text(ingredient.name)
+                Button(onClick = {
+                    coroutineScope.launch {
+                        viewModel.addIngredient("Milk")
+                        ingredients = viewModel.getAllIngredients()
+                    }
+                }
+                    ,modifier = Modifier.fillParentMaxWidth()
+                ) {
+                    Text("Add Milk")
+                }
             }
         }
     }
 }
+
