@@ -1,4 +1,4 @@
-package com.seniorproject.cupboardly.viewmodel
+package com.seniorproject.cupboardly.viewModels
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
