@@ -21,7 +21,7 @@ class MainActivity : ComponentActivity() {
                         onGoToRecipes = { currentScreen = "recipes" }
                     )
                     "recipes" -> RecipeScreen(
-                        onBack = { currentScreen = "ingredients" }
+                        onGoToIngredients = { currentScreen = "ingredients" }
                     )
                 }
             }
