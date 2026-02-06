@@ -14,7 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.seniorproject.cupboardly.room.entity.RecipeEntity
-import com.seniorproject.cupboardly.viewmodel.RecipeViewModel
+import com.seniorproject.cupboardly.viewModels.RecipeViewModel
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 

@@ -10,7 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.seniorproject.cupboardly.room.entity.IngredientEntity
-import com.seniorproject.cupboardly.viewmodel.IngredientViewModel
+import com.seniorproject.cupboardly.viewModels.IngredientViewModel
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
