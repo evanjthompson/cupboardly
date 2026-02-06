@@ -39,7 +39,7 @@ fun IngredientScreen(
                 ingredients = viewModel.getAllIngredients()
             }
         }) {
-            Text("Add Milk")
+            Text("+")
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -54,16 +54,18 @@ fun IngredientScreen(
 
         LazyColumn {
             items(ingredients) { ingredient ->
-                Text(ingredient.name)
-                Button(onClick = {
-                    coroutineScope.launch {
-                        viewModel.addIngredient("Milk")
-                        ingredients = viewModel.getAllIngredients()
-                    }
-                }
-                    ,modifier = Modifier.fillParentMaxWidth()
+                Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            viewModel.deleteIngredient(ingredient) // deletes ingredient on button press
+                            ingredients = viewModel.getAllIngredients()
+                        }
+                    },
+                    modifier = Modifier
+                        .fillParentMaxWidth()
+                        .padding(vertical = 4.dp) // optional: spacing between buttons
                 ) {
-                    Text("Add Milk")
+                    Text(ingredient.name)
                 }
             }
         }
