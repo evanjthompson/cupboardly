@@ -12,9 +12,9 @@ class IngredientViewModel(application: Application) :
 
     private val repository = Ingredient(application)
 
-    fun addIngredient(name: String) {
+    fun addIngredient(name: String, quantity: Double, unit: String, price: Double, pricePerUnit: Double, dateEntered: Int, dateLastUpdated: Int, amountUsedRecently: Double) {
         viewModelScope.launch {
-            repository.addIngredient(name)
+            repository.addIngredient(name, quantity, unit, price, pricePerUnit, dateEntered, dateLastUpdated, amountUsedRecently)
         }
     }
 

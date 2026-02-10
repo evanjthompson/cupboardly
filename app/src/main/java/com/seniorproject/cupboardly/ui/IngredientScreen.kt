@@ -97,7 +97,7 @@ fun IngredientScreen(
 
             onClick = {
                 coroutineScope.launch {
-                    viewModel.addIngredient("Milk")
+                    viewModel.addIngredient("Milk", 2.0, "Gallon(s)", 10.0, 5.0, 20261002, 20261002, 2.5)
                     ingredients = viewModel.getAllIngredients()
                 }
             },
