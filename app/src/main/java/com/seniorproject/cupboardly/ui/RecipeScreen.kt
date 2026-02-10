@@ -45,7 +45,11 @@ fun RecipeScreen(
             ) {
                 Button(
                     onClick = onGoToIngredients,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Blue,
+                        contentColor = Color.White
+                    )
                 ) {
                     Text("Ingredients")
                 }
@@ -54,8 +58,8 @@ fun RecipeScreen(
                     onClick = {},   // no action
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Gray,
-                        contentColor = Color.White
+                        containerColor = Color.Green,
+                        contentColor = Color.Black
                     )
                 ) {
                     Text("Recipes")
@@ -76,7 +80,11 @@ fun RecipeScreen(
                         },
                         modifier = Modifier
                             .fillParentMaxWidth()
-                            .padding(vertical = 4.dp)
+                            .padding(vertical = 4.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Green,
+                            contentColor = Color.Black
+                        )
                     ) {
                         Text(recipe.name)
                     }
