@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -11,11 +12,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.seniorproject.cupboardly.room.entity.IngredientEntity
 import com.seniorproject.cupboardly.viewModels.IngredientViewModel
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.ui.unit.sp
 
 @Composable
@@ -23,14 +21,11 @@ fun IngredientScreen(
     viewModel: IngredientViewModel = viewModel(),
     onGoToRecipes: () -> Unit
 ) {
-    var ingredients by remember { mutableStateOf(listOf<IngredientEntity>()) }
-    val coroutineScope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) {
-        ingredients = viewModel.getAllIngredients()
-    }
+    // Collect the ingredients StateFlow as Compose state
+    val ingredients by viewModel.ingredients.collectAsState(initial = emptyList())
 
-    Box(modifier = Modifier.fillMaxSize()) {  // box allows floating button (+ button added below)
+    Box(modifier = Modifier.fillMaxSize()) {  // box allows floating '+' button
 
         Column(
             modifier = Modifier
@@ -70,23 +65,18 @@ fun IngredientScreen(
 
             // Scrollable list of ingredients
             LazyColumn {
-                items(ingredients) { ingredient ->
+                items(ingredients) { ingredient: IngredientEntity ->  // explicit type
                     Button(
-                        onClick = {
-                            coroutineScope.launch {
-                                viewModel.deleteIngredient(ingredient)
-                                ingredients = viewModel.getAllIngredients()
-                            }
-                        },
+                        onClick = { viewModel.deleteIngredient(ingredient) },
                         modifier = Modifier
                             .fillParentMaxWidth()
                             .padding(vertical = 4.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color.Blue,
-                                contentColor = Color.White
-                            )
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Blue,
+                            contentColor = Color.White
+                        )
                     ) {
-                        Text(ingredient.name)
+                        Text(ingredient.name + " " + ingredient.quantity +  " " + ingredient.unit)
                     }
                 }
             }
@@ -94,12 +84,17 @@ fun IngredientScreen(
 
         // '+' button in bottom corner
         Button(
-
             onClick = {
-                coroutineScope.launch {
-                    viewModel.addIngredient("Milk", 2.0, "Gallon(s)", 10.0, 5.0, 20261002, 20261002, 2.5)
-                    ingredients = viewModel.getAllIngredients()
-                }
+                val currentDate = (System.currentTimeMillis() / 1000).toInt()
+                viewModel.addIngredient(
+                    name = "Milk",
+                    quantity = 2.0,
+                    unit = "Gallon(s)",
+                    price = 10.0,
+                    pricePerUnit = 5.0,
+                    dateEntered = currentDate,
+                    dateLastUpdated = currentDate
+                )
             },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -110,8 +105,7 @@ fun IngredientScreen(
                 contentColor = Color.Black
             )
         ) {
-            Text("+",
-                fontSize = 32.sp)
+            Text("+", fontSize = 32.sp)
         }
     }
 }

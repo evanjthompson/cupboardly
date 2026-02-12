@@ -15,6 +15,9 @@ interface IngredientDao {
     @Delete
     suspend fun delete(ingredient: IngredientEntity)
 
+    @Query("SELECT * FROM ingredient_table WHERE name = :name LIMIT 1")
+    suspend fun getIngredientByName(name: String): IngredientEntity?
+
     @Query("SELECT * FROM ingredient_table ORDER BY name ASC")
     suspend fun getAllIngredients(): List<IngredientEntity>
 }
