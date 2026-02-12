@@ -5,13 +5,12 @@ import androidx.room.PrimaryKey
 
 @Entity(tableName = "ingredient_table")
 data class IngredientEntity(
-    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
-    val quantity: Double,
+    val quantity: Double,          // current inventory
     val unit: String,
-    val price: Double,
-    val pricePerUnit: Double,
+    val price: Double,             // total price of current quantity
+    val pricePerUnit: Double,      // price per single unit
     val dateEntered: Int,
-    val dateLastUpdated: Int,
-    val amountUsedRecently: Double
+    val dateLastUpdated: Int
 )

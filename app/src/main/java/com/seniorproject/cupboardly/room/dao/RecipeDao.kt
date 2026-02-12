@@ -7,7 +7,7 @@ import com.seniorproject.cupboardly.room.entity.RecipeEntity
 interface RecipeDao {
 
     @Insert
-    suspend fun insert(recipe: RecipeEntity)
+    suspend fun insert(recipe: RecipeEntity): Long // returns the rowId of the inserted recipe
 
     @Update
     suspend fun update(recipe: RecipeEntity)
