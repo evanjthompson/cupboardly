@@ -1,5 +1,6 @@
 package com.seniorproject.cupboardly.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,7 +13,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.seniorproject.cupboardly.R
 import com.seniorproject.cupboardly.viewModels.IngredientViewModel
 import com.seniorproject.cupboardly.viewModels.RecipeViewModel
 import kotlinx.coroutines.launch
@@ -49,7 +53,12 @@ fun RecipeScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-
+        Image(
+            painter = painterResource(id = R.drawable.striperecipebg ),
+            contentDescription = "Ingredient Background",
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier.matchParentSize()
+        )
         Column(
             modifier = Modifier
                 .fillMaxSize()
