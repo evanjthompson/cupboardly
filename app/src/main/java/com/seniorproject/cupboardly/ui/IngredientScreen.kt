@@ -1,5 +1,6 @@
 package com.seniorproject.cupboardly.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,7 +13,10 @@ import com.seniorproject.cupboardly.room.entity.IngredientEntity
 import com.seniorproject.cupboardly.viewModels.IngredientViewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.sp
+import com.seniorproject.cupboardly.R
 
 @Composable
 fun IngredientScreen(
@@ -32,7 +36,12 @@ fun IngredientScreen(
     var price by remember { mutableStateOf("") }
 
     Box(modifier = Modifier.fillMaxSize()) {
-
+        Image(
+            painter = painterResource(id = R.drawable.stripeingredientBG ),
+            contentDescription = "Ingredient Background",
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier.matchParentSize()
+            )
         Column(
             modifier = Modifier
                 .fillMaxSize()
