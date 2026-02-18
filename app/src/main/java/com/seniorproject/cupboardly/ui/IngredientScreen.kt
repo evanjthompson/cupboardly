@@ -37,7 +37,7 @@ fun IngredientScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
-            painter = painterResource(id = R.drawable.stripeingredientBG ),
+            painter = painterResource(id = R.drawable.stripeingredientbg ),
             contentDescription = "Ingredient Background",
             contentScale = ContentScale.FillBounds,
             modifier = Modifier.matchParentSize()
