@@ -56,9 +56,11 @@ fun RecipeScreen(
     //Custom color vars for UI theming
     val gold = Color (red = 197, green = 145, blue = 39)
     val darkBlue = Color (red = 11, green = 186, blue =224)
-   // val lightOrange = Color (red = 255, green = 233, blue = 206)
-    val headerPink1 = Color (red = 255, green = 150, blue = 174)
+    //val lightOrange = Color (red = 255, green = 233, blue = 206)
+    //val headerPink1 = Color (red = 255, green = 150, blue = 174)
+    val headerPink2 = Color (red = 210, green = 106, blue = 131)
     val headerBlue1 = Color (red = 140, green = 198, blue = 209)
+    //val headerBlue2 = Color (red = 105, green = 150, blue = 156)
 
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -82,8 +84,8 @@ fun RecipeScreen(
                     onClick = onGoToIngredients,
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = headerPink1,
-                        contentColor = Color.Black
+                        containerColor = headerPink2,
+                        contentColor = Color.White
                     )
                 ) {
                     Text("Ingredients")
