@@ -1,5 +1,7 @@
 package com.seniorproject.cupboardly.ui
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,7 +14,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.seniorproject.cupboardly.R
 import com.seniorproject.cupboardly.viewModels.IngredientViewModel
 import com.seniorproject.cupboardly.viewModels.RecipeViewModel
 import kotlinx.coroutines.launch
@@ -48,8 +53,23 @@ fun RecipeScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    //Custom color vars for UI theming
+    val gold = Color (red = 197, green = 145, blue = 39)
+    val darkBlue = Color (red = 11, green = 186, blue =224)
+    //val lightOrange = Color (red = 255, green = 233, blue = 206)
+    //val headerPink1 = Color (red = 255, green = 150, blue = 174)
+    val headerPink2 = Color (red = 210, green = 106, blue = 131)
+    val headerBlue1 = Color (red = 140, green = 198, blue = 209)
+    //val headerBlue2 = Color (red = 105, green = 150, blue = 156)
 
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Image(
+            painter = painterResource(id = R.drawable.striperecipebg ),
+            contentDescription = "Ingredient Background",
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier.matchParentSize()
+        )
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -64,7 +84,7 @@ fun RecipeScreen(
                     onClick = onGoToIngredients,
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Blue,
+                        containerColor = headerPink2,
                         contentColor = Color.White
                     )
                 ) {
@@ -75,8 +95,8 @@ fun RecipeScreen(
                     onClick = {},   // no action
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Green,
-                        contentColor = Color.Black
+                        containerColor = headerBlue1,
+                        contentColor = Color.White
                     )
                 ) {
                     Text("Recipes")
@@ -89,12 +109,13 @@ fun RecipeScreen(
                 items(recipes) { recipe ->
 
                     Button(
+                        border = BorderStroke(2.dp, darkBlue),
                         onClick = { viewModel.deleteRecipe(recipe) },
                         modifier = Modifier
                             .fillParentMaxWidth()
                             .padding(vertical = 4.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Green,
+                            containerColor = Color.White,
                             contentColor = Color.Black
                         )
                     ) {
@@ -139,8 +160,8 @@ fun RecipeScreen(
                 .padding(35.dp)
                 .size(64.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color.Yellow,
-                contentColor = Color.Black
+                containerColor = gold,
+                contentColor = Color.White
             )
         ) {
             Text("+", fontSize = 32.sp)

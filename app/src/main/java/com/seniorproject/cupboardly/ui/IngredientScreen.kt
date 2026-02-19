@@ -1,5 +1,7 @@
 package com.seniorproject.cupboardly.ui
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -13,7 +15,10 @@ import com.seniorproject.cupboardly.room.entity.IngredientEntity
 import com.seniorproject.cupboardly.viewModels.IngredientViewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.sp
+import com.seniorproject.cupboardly.R
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 
@@ -34,6 +39,14 @@ fun IngredientScreen(
     var unit by remember { mutableStateOf("") }
     var price by remember { mutableStateOf("") }
 
+    // Custom color vars for UI theming
+    val gold = Color (red = 197, green = 145, blue = 39)
+    val darkBlue = Color (red = 11, green = 186, blue =224)
+    //val lightOrange = Color (red = 255, green = 233, blue = 206)
+    val headerPink1 = Color (red = 255, green = 150, blue = 174)
+    //val headerPink2 = Color (red = 210, green = 106, blue = 131)
+    //val headerBlue1 = Color (red = 140, green = 198, blue = 209)
+    val headerBlue2 = Color (red = 105, green = 150, blue = 156)
     // Validation error states
     var nameError by remember { mutableStateOf<String?>(null) }
     var quantityError by remember { mutableStateOf<String?>(null) }
@@ -41,6 +54,13 @@ fun IngredientScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
 
+    Box(modifier = Modifier.fillMaxSize()) {
+        Image(
+            painter = painterResource(id = R.drawable.stripeingredientbg ),
+            contentDescription = "Ingredient Background",
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier.matchParentSize()
+            )
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -55,7 +75,7 @@ fun IngredientScreen(
                     onClick = {},
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Blue,
+                        containerColor = headerPink1,
                         contentColor = Color.White
                     )
                 ) {
@@ -66,8 +86,8 @@ fun IngredientScreen(
                     onClick = onGoToRecipes,
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Green,
-                        contentColor = Color.Black
+                        containerColor = headerBlue2,
+                        contentColor = Color.White
                     )
                 ) {
                     Text("Recipes")
@@ -83,13 +103,14 @@ fun IngredientScreen(
             LazyColumn {
                 items(ingredients) { ingredient: IngredientEntity ->
                     Button(
+                        border = BorderStroke(2.dp, gold),
                         onClick = { viewModel.deleteIngredient(ingredient) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Blue,
-                            contentColor = Color.White
+                            containerColor = Color.White,
+                            contentColor = Color.Black
                         )
                     ) {
                         Text("${ingredient.name} ${ingredient.quantity} ${ingredient.unit}")
@@ -106,8 +127,8 @@ fun IngredientScreen(
                 .padding(35.dp)
                 .size(64.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color.Yellow,
-                contentColor = Color.Black
+                containerColor = darkBlue,
+                contentColor = Color.White
             )
         ) {
             Text("+", fontSize = 32.sp)
