@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import com.seniorproject.cupboardly.R
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.ui.text.font.FontWeight
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -81,20 +82,22 @@ fun IngredientScreen(
                 ) {
                     Button(
                         onClick = {},
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(2f),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = headerPink1,
+                            containerColor = gold,
                             contentColor = Color.White
                         )
                     ) {
-                        Text("Ingredients")
+                        Text("Ingredients",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold)
                     }
 
                     Button(
                         onClick = onGoToRecipes,
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = headerBlue2,
+                            containerColor = Color.DarkGray,
                             contentColor = Color.White
                         )
                     ) {

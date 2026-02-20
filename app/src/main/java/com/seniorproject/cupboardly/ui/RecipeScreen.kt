@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.seniorproject.cupboardly.R
 import com.seniorproject.cupboardly.room.entity.RecipeEntity
@@ -88,19 +89,22 @@ fun RecipeScreen(
                     onClick = onGoToIngredients,
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = headerPink2,
+                        containerColor = Color.DarkGray,
                         contentColor = Color.White
                     )
                 ) { Text("Ingredients") }
 
                 Button(
                     onClick = {},
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(2f),
+
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = headerBlue1,
+                        containerColor = darkBlue,
                         contentColor = Color.White
                     )
-                ) { Text("Recipes") }
+                ) { Text("Recipes",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold) }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
