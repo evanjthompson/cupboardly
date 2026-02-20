@@ -113,7 +113,7 @@ fun RecipeScreen(
 
                     Surface(
                         shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(2.dp, gold),
+                        border = BorderStroke(2.dp, darkBlue),
                         color = Color.White,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -188,7 +188,7 @@ fun RecipeScreen(
                 .padding(35.dp)
                 .size(64.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = darkBlue,
+                containerColor = gold,
                 contentColor = Color.White
             )
         ) { Text("+", fontSize = 32.sp) }
