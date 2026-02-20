@@ -169,7 +169,7 @@ fun IngredientScreen(
                                         }
 
                                         Button(
-                                            onClick = {  },
+                                            onClick = { viewModel.deleteIngredient(ingredient) },
                                             colors = ButtonDefaults.buttonColors(
                                                 containerColor = gold,
                                                 contentColor = Color.White
