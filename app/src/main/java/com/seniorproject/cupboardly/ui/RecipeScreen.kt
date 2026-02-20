@@ -152,7 +152,7 @@ fun RecipeScreen(
                                     Button(
                                         onClick = {  },
                                         colors = ButtonDefaults.buttonColors(
-                                            containerColor = gold,
+                                            containerColor = darkBlue,
                                             contentColor = Color.White
                                         ),
                                         modifier = Modifier.weight(1f)
@@ -161,7 +161,7 @@ fun RecipeScreen(
                                     Button(
                                         onClick = { viewModel.deleteRecipe(recipe) },
                                         colors = ButtonDefaults.buttonColors(
-                                            containerColor = gold,
+                                            containerColor = darkBlue,
                                             contentColor = Color.White
                                         ),
                                         modifier = Modifier.weight(1f)
