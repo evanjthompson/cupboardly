@@ -35,29 +35,21 @@ fun IngredientScreen(
     onGoToRecipes: () -> Unit
 ) {
 
-    // For formatting the dates
     val sdf = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
-
     val ingredients by viewModel.ingredients.collectAsState(initial = emptyList())
 
-    // variable to indicate a new ingredient is to be added
     var showAddNew by remember { mutableStateOf(false) }
 
-    // Input states
     var name by remember { mutableStateOf("") }
     var quantity by remember { mutableStateOf("") }
     var unit by remember { mutableStateOf("") }
     var price by remember { mutableStateOf("") }
 
-    // Custom color vars for UI theming
-    val gold = Color(red = 197, green = 145, blue = 39)
-    val darkBlue = Color(red = 11, green = 186, blue = 224)
-    //val lightOrange = Color (red = 255, green = 233, blue = 206)
-    val headerPink1 = Color(red = 255, green = 150, blue = 174)
-    //val headerPink2 = Color (red = 210, green = 106, blue = 131)
-    //val headerBlue1 = Color (red = 140, green = 198, blue = 209)
-    val headerBlue2 = Color(red = 105, green = 150, blue = 156)
-    // Validation error states
+    val gold = Color(197,145,39)
+    val darkBlue = Color(11,186,224)
+    val headerPink1 = Color(255,150,174)
+    val headerBlue2 = Color(105,150,156)
+
     var nameError by remember { mutableStateOf<String?>(null) }
     var quantityError by remember { mutableStateOf<String?>(null) }
     var priceError by remember { mutableStateOf<String?>(null) }
@@ -71,6 +63,7 @@ fun IngredientScreen(
                 contentScale = ContentScale.FillBounds,
                 modifier = Modifier.matchParentSize()
             )
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -89,9 +82,7 @@ fun IngredientScreen(
                             contentColor = Color.White
                         )
                     ) {
-                        Text("Ingredients",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold)
+                        Text("Ingredients", fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     }
 
                     Button(
@@ -118,12 +109,10 @@ fun IngredientScreen(
                         key = { it.id }
                     ) { ingredient ->
 
-                        // UI state for each ingredient
                         var expanded by remember { mutableStateOf(false) }
                         var isEditing by remember { mutableStateOf(false) }
                         var isAddingMore by remember { mutableStateOf(false) }
 
-                        // Error states
                         var editNameError by remember { mutableStateOf<String?>(null) }
                         var editQuantityError by remember { mutableStateOf<String?>(null) }
                         var editPriceError by remember { mutableStateOf<String?>(null) }
@@ -131,13 +120,11 @@ fun IngredientScreen(
                         var addMoreQuantityError by remember { mutableStateOf<String?>(null) }
                         var addMorePriceError by remember { mutableStateOf<String?>(null) }
 
-                        // Values for editing
                         var editName by remember { mutableStateOf(ingredient.name) }
                         var editQuantity by remember { mutableStateOf(ingredient.quantity.toString()) }
                         var editUnit by remember { mutableStateOf(ingredient.unit) }
                         var editPrice by remember { mutableStateOf(ingredient.price.toString()) }
 
-                        // Values for adding more
                         var addMoreQuantity by remember { mutableStateOf("") }
                         var addMorePrice by remember { mutableStateOf("") }
 
@@ -158,24 +145,29 @@ fun IngredientScreen(
                                     .padding(16.dp)
                             ) {
 
-                                // Collapsed title
                                 if (!isEditing && !isAddingMore) {
                                     Text("${ingredient.name} ${ingredient.quantity} ${ingredient.unit}")
                                 } else {
-                                    Text(ingredient.name) // only show name when editing or adding more
+                                    Text(ingredient.name)
                                 }
 
                                 if (expanded) {
                                     when {
                                         isAddingMore -> {
+
                                             Spacer(modifier = Modifier.height(8.dp))
 
                                             OutlinedTextField(
                                                 value = addMoreQuantity,
                                                 onValueChange = { addMoreQuantity = it; addMoreQuantityError = null },
                                                 label = { Text("Add Quantity") },
+                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                                 isError = addMoreQuantityError != null,
-                                                supportingText = { addMoreQuantityError?.let { Text(it, color = MaterialTheme.colorScheme.error) } },
+                                                supportingText = {
+                                                    addMoreQuantityError?.let {
+                                                        Text(it, color = MaterialTheme.colorScheme.error)
+                                                    }
+                                                },
                                                 modifier = Modifier.fillMaxWidth()
                                             )
 
@@ -183,8 +175,13 @@ fun IngredientScreen(
                                                 value = addMorePrice,
                                                 onValueChange = { addMorePrice = it; addMorePriceError = null },
                                                 label = { Text("Price of Additional Quantity") },
+                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                                 isError = addMorePriceError != null,
-                                                supportingText = { addMorePriceError?.let { Text(it, color = MaterialTheme.colorScheme.error) } },
+                                                supportingText = {
+                                                    addMorePriceError?.let {
+                                                        Text(it, color = MaterialTheme.colorScheme.error)
+                                                    }
+                                                },
                                                 modifier = Modifier.fillMaxWidth()
                                             )
 
@@ -194,7 +191,6 @@ fun IngredientScreen(
                                             ) {
                                                 Button(
                                                     onClick = {
-                                                        // Cancel Add More
                                                         addMoreQuantity = ""
                                                         addMorePrice = ""
                                                         addMoreQuantityError = null
@@ -207,7 +203,6 @@ fun IngredientScreen(
 
                                                 Button(
                                                     onClick = {
-                                                        // Validate
                                                         val quantityValue = addMoreQuantity.toDoubleOrNull()
                                                         val priceValue = addMorePrice.toDoubleOrNull()
                                                         var valid = true
@@ -216,8 +211,8 @@ fun IngredientScreen(
                                                             addMoreQuantityError = "Quantity must be > 0"
                                                             valid = false
                                                         }
-                                                        if (priceValue == null || priceValue < 0) {
-                                                            addMorePriceError = "Price cannot be negative"
+                                                        if (priceValue == null || priceValue <= 0) {
+                                                            addMorePriceError = "Enter new price"
                                                             valid = false
                                                         }
 
@@ -238,7 +233,6 @@ fun IngredientScreen(
 
                                                             viewModel.updateIngredient(updatedIngredient)
 
-                                                            // Reset Add More state
                                                             addMoreQuantity = ""
                                                             addMorePrice = ""
                                                             isAddingMore = false
@@ -251,6 +245,7 @@ fun IngredientScreen(
                                         }
 
                                         isEditing -> {
+
                                             Spacer(modifier = Modifier.height(8.dp))
 
                                             OutlinedTextField(
@@ -258,7 +253,11 @@ fun IngredientScreen(
                                                 onValueChange = { editName = it; editNameError = null },
                                                 label = { Text("Name (currently ${ingredient.name})") },
                                                 isError = editNameError != null,
-                                                supportingText = { editNameError?.let { Text(it, color = MaterialTheme.colorScheme.error) } },
+                                                supportingText = {
+                                                    editNameError?.let {
+                                                        Text(it, color = MaterialTheme.colorScheme.error)
+                                                    }
+                                                },
                                                 modifier = Modifier.fillMaxWidth()
                                             )
 
@@ -268,7 +267,11 @@ fun IngredientScreen(
                                                 label = { Text("Quantity (currently ${ingredient.quantity})") },
                                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                                 isError = editQuantityError != null,
-                                                supportingText = { editQuantityError?.let { Text(it, color = MaterialTheme.colorScheme.error) } },
+                                                supportingText = {
+                                                    editQuantityError?.let {
+                                                        Text(it, color = MaterialTheme.colorScheme.error)
+                                                    }
+                                                },
                                                 modifier = Modifier.fillMaxWidth()
                                             )
 
@@ -285,7 +288,11 @@ fun IngredientScreen(
                                                 label = { Text("Price (currently ${ingredient.price})") },
                                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                                 isError = editPriceError != null,
-                                                supportingText = { editPriceError?.let { Text(it, color = MaterialTheme.colorScheme.error) } },
+                                                supportingText = {
+                                                    editPriceError?.let {
+                                                        Text(it, color = MaterialTheme.colorScheme.error)
+                                                    }
+                                                },
                                                 modifier = Modifier.fillMaxWidth()
                                             )
 
@@ -306,12 +313,24 @@ fun IngredientScreen(
                                                         val priceValue = editPrice.toDoubleOrNull()
                                                         var valid = true
 
-                                                        if (trimmedName.isBlank()) { editNameError = "Enter a name"; valid = false }
-                                                        if (quantityValue == null || quantityValue <= 0) { editQuantityError = "Quantity > 0"; valid = false }
-                                                        if (priceValue == null || priceValue < 0) { editPriceError = "Price >= 0"; valid = false }
+                                                        if (trimmedName.isBlank()) {
+                                                            editNameError = "Enter a name"
+                                                            valid = false
+                                                        }
+                                                        if (quantityValue == null || quantityValue <= 0) {
+                                                            editQuantityError = "Quantity > 0"
+                                                            valid = false
+                                                        }
+                                                        if (priceValue == null || priceValue < 0) {
+                                                            editPriceError = "Price >= 0"
+                                                            valid = false
+                                                        }
 
-                                                        // Check name uniqueness
-                                                        if (ingredients.any { it.id != ingredient.id && it.name.equals(trimmedName, ignoreCase = true) }) {
+                                                        if (ingredients.any {
+                                                                it.id != ingredient.id &&
+                                                                        it.name.equals(trimmedName, ignoreCase = true)
+                                                            }
+                                                        ) {
                                                             editNameError = "Name already exists"
                                                             valid = false
                                                         }
@@ -346,7 +365,7 @@ fun IngredientScreen(
                                         }
 
                                         else -> {
-                                            // Normal expanded view
+
                                             Spacer(modifier = Modifier.height(8.dp))
                                             Text("Total Price: $${ingredient.price}")
                                             Text("Price per Unit: $${"%.2f".format(ingredient.pricePerUnit)} per ${ingredient.unit}")
@@ -357,6 +376,7 @@ fun IngredientScreen(
                                             Text("Total Cost All Time: $${ingredient.allTimePrice}")
 
                                             Spacer(modifier = Modifier.height(12.dp))
+
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
                                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -393,74 +413,87 @@ fun IngredientScreen(
                     }
                 }
             }
-                // Floating Add Button
-                Button(
-                    onClick = { showAddNew = true },
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(35.dp)
-                        .size(64.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = darkBlue,
-                        contentColor = Color.White
-                    )
-                ) {
-                    Text("+", fontSize = 32.sp)
+
+            Button(
+                onClick = { showAddNew = true },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(35.dp)
+                    .size(64.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = darkBlue,
+                    contentColor = Color.White
+                )
+            ) {
+                Text("+", fontSize = 32.sp)
+            }
+
+            if (showAddNew) {
+
+                var expanded by remember { mutableStateOf(false) }
+
+                val matchingIngredients = ingredients.filter {
+                    it.name.contains(name.trim(), ignoreCase = true) && name.isNotBlank()
                 }
 
-                if (showAddNew) {
+                AlertDialog(
+                    onDismissRequest = { showAddNew = false },
 
-                    var expanded by remember { mutableStateOf(false) }
+                    confirmButton = {
+                        Button(onClick = {
 
-                    val matchingIngredients = ingredients.filter {
-                        it.name.contains(name.trim(), ignoreCase = true) &&
-                                name.isNotBlank()
-                    }
+                            nameError = null
+                            quantityError = null
+                            priceError = null
 
-                    AlertDialog(
-                        onDismissRequest = { showAddNew = false },
+                            val trimmedName = name.trim()
+                            val quantityValue = quantity.toDoubleOrNull()
+                            val priceValue = price.toDoubleOrNull()
 
-                        confirmButton = {
-                            Button(onClick = {
+                            var isValid = true
 
-                                nameError = null
-                                quantityError = null
-                                priceError = null
+                            if (trimmedName.isBlank()) {
+                                nameError = "Please enter a Name"
+                                isValid = false
+                            }
 
-                                val trimmedName = name.trim()
-                                val quantityValue = quantity.toDoubleOrNull()
-                                val priceValue = price.toDoubleOrNull()
+                            if (quantityValue == null || quantityValue <= 0.0) {
+                                quantityError = "Quantity cannot be 0"
+                                isValid = false
+                            }
 
-                                var isValid = true
+                            if (priceValue == null || priceValue <= 0.0) {
+                                priceError = "Enter the new purchase price"
+                                isValid = false
+                            }
 
-                                if (trimmedName.isBlank()) {
-                                    nameError = "Please enter a Name"
-                                    isValid = false
-                                }
+                            if (!isValid) return@Button
 
-                                if (quantityValue == null || quantityValue <= 0.0) {
-                                    quantityError = "Quantity cannot be 0"
-                                    isValid = false
-                                }
+                            val currentDate =
+                                (System.currentTimeMillis() / 1000).toInt()
 
-                                if (priceValue == null || priceValue < 0.0) {
-                                    priceError = "Price cannot be 0"
-                                    isValid = false
-                                }
+                            val existingIngredient = ingredients.find {
+                                it.name.equals(trimmedName, ignoreCase = true)
+                            }
 
-                                val exists = ingredients.any {
-                                    it.name.equals(trimmedName, ignoreCase = true)
-                                }
+                            if (existingIngredient != null) {
 
-                                if (exists) {
-                                    nameError = "Ingredient already exists"
-                                    isValid = false
-                                }
+                                val newQuantity = existingIngredient.quantity + quantityValue!!
+                                val newTotalPrice = existingIngredient.price + priceValue!!
+                                val newPricePerUnit = newTotalPrice / newQuantity
 
-                                if (!isValid) return@Button
+                                val updatedIngredient = existingIngredient.copy(
+                                    quantity = newQuantity,
+                                    price = newTotalPrice,
+                                    pricePerUnit = newPricePerUnit,
+                                    allTimeQuantity = existingIngredient.allTimeQuantity + quantityValue,
+                                    allTimePrice = existingIngredient.allTimePrice + priceValue,
+                                    dateLastUpdated = currentDate
+                                )
 
-                                val currentDate =
-                                    (System.currentTimeMillis() / 1000).toInt()
+                                viewModel.updateIngredient(updatedIngredient)
+
+                            } else {
 
                                 val pricePerUnitValue =
                                     priceValue!! / quantityValue!!
@@ -474,134 +507,134 @@ fun IngredientScreen(
                                     dateEntered = currentDate,
                                     dateLastUpdated = currentDate
                                 )
-
-                                name = ""
-                                quantity = ""
-                                unit = ""
-                                price = ""
-                                showAddNew = false
-
-                            }) {
-                                Text("Add")
                             }
-                        },
 
-                        dismissButton = {
-                            Button(onClick = { showAddNew = false }) {
-                                Text("Cancel")
-                            }
-                        },
+                            name = ""
+                            quantity = ""
+                            unit = ""
+                            price = ""
+                            showAddNew = false
 
-                        title = { Text("Add Ingredient") },
+                        }) {
+                            Text("Add")
+                        }
+                    },
 
-                        text = {
-                            Column {
+                    dismissButton = {
+                        Button(onClick = { showAddNew = false }) {
+                            Text("Cancel")
+                        }
+                    },
 
-                                // NAME FIELD WITH UPDATED MENU ANCHOR
-                                ExposedDropdownMenuBox(
+                    title = { Text("Add Ingredient") },
+
+                    text = {
+                        Column {
+
+                            ExposedDropdownMenuBox(
+                                expanded = expanded && matchingIngredients.isNotEmpty(),
+                                onExpandedChange = { expanded = it }
+                            ) {
+
+                                OutlinedTextField(
+                                    value = name,
+                                    onValueChange = {
+                                        name = it
+                                        expanded = true
+                                    },
+                                    label = { Text("Ingredient Name") },
+                                    isError = nameError != null,
+                                    modifier = Modifier
+                                        .menuAnchor(
+                                            type = ExposedDropdownMenuAnchorType.PrimaryEditable,
+                                            enabled = true
+                                        )
+                                        .fillMaxWidth(),
+                                    trailingIcon = {
+                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded)
+                                    },
+                                    supportingText = {
+                                        nameError?.let {
+                                            Text(
+                                                it,
+                                                color = MaterialTheme.colorScheme.error
+                                            )
+                                        }
+                                    }
+                                )
+
+                                ExposedDropdownMenu(
                                     expanded = expanded && matchingIngredients.isNotEmpty(),
-                                    onExpandedChange = { expanded = it }
+                                    onDismissRequest = { expanded = false }
                                 ) {
-
-                                    OutlinedTextField(
-                                        value = name,
-                                        onValueChange = {
-                                            name = it
-                                            expanded = true
-                                        },
-                                        label = { Text("Ingredient Name") },
-                                        isError = nameError != null,
-                                        modifier = Modifier
-                                            .menuAnchor(
-                                                type = ExposedDropdownMenuAnchorType.PrimaryEditable,
-                                                enabled = true
-                                            )
-                                            .fillMaxWidth(),
-                                        trailingIcon = {
-                                            ExposedDropdownMenuDefaults.TrailingIcon(expanded)
-                                        },
-                                        supportingText = {
-                                            nameError?.let {
-                                                Text(
-                                                    it,
-                                                    color = MaterialTheme.colorScheme.error
-                                                )
+                                    matchingIngredients.forEach { ingredient ->
+                                        DropdownMenuItem(
+                                            text = { Text(ingredient.name) },
+                                            onClick = {
+                                                name = ingredient.name
+                                                unit = ingredient.unit
+                                                price = ""
+                                                expanded = false
                                             }
-                                        }
-                                    )
-
-                                    ExposedDropdownMenu(
-                                        expanded = expanded && matchingIngredients.isNotEmpty(),
-                                        onDismissRequest = { expanded = false }
-                                    ) {
-                                        matchingIngredients.forEach { ingredient ->
-                                            DropdownMenuItem(
-                                                text = { Text(ingredient.name) },
-                                                onClick = {
-                                                    name = ingredient.name
-                                                    unit = ingredient.unit
-                                                    expanded = false
-                                                }
-                                            )
-                                        }
+                                        )
                                     }
                                 }
-
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                OutlinedTextField(
-                                    value = quantity,
-                                    onValueChange = { quantity = it },
-                                    label = { Text("Quantity") },
-                                    keyboardOptions = KeyboardOptions(
-                                        keyboardType = KeyboardType.Number
-                                    ),
-                                    isError = quantityError != null,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    supportingText = {
-                                        quantityError?.let {
-                                            Text(
-                                                it,
-                                                color = MaterialTheme.colorScheme.error
-                                            )
-                                        }
-                                    }
-                                )
-
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                OutlinedTextField(
-                                    value = unit,
-                                    onValueChange = { unit = it },
-                                    label = { Text("Unit of Measurement") },
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                OutlinedTextField(
-                                    value = price,
-                                    onValueChange = { price = it },
-                                    label = { Text("Price") },
-                                    keyboardOptions = KeyboardOptions(
-                                        keyboardType = KeyboardType.Number
-                                    ),
-                                    isError = priceError != null,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    supportingText = {
-                                        priceError?.let {
-                                            Text(
-                                                it,
-                                                color = MaterialTheme.colorScheme.error
-                                            )
-                                        }
-                                    }
-                                )
                             }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            OutlinedTextField(
+                                value = quantity,
+                                onValueChange = { quantity = it },
+                                label = { Text("Quantity") },
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Number
+                                ),
+                                isError = quantityError != null,
+                                modifier = Modifier.fillMaxWidth(),
+                                supportingText = {
+                                    quantityError?.let {
+                                        Text(
+                                            it,
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                }
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            OutlinedTextField(
+                                value = unit,
+                                onValueChange = { unit = it },
+                                label = { Text("Unit of Measurement") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            OutlinedTextField(
+                                value = price,
+                                onValueChange = { price = it },
+                                label = { Text("Price") },
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Number
+                                ),
+                                isError = priceError != null,
+                                modifier = Modifier.fillMaxWidth(),
+                                supportingText = {
+                                    priceError?.let {
+                                        Text(
+                                            it,
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                }
+                            )
                         }
-                    )
-                }
+                    }
+                )
             }
         }
     }
-
+}
