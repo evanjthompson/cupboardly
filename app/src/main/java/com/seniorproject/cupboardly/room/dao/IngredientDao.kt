@@ -18,6 +18,9 @@ interface IngredientDao {
     @Query("SELECT * FROM ingredient_table WHERE name = :name LIMIT 1")
     suspend fun getIngredientByName(name: String): IngredientEntity?
 
+    @Query("SELECT * FROM ingredient_table WHERE id = :id LIMIT 1")
+    suspend fun getIngredientById(id: Long): IngredientEntity?
+
     @Query("SELECT * FROM ingredient_table ORDER BY name ASC")
     suspend fun getAllIngredients(): List<IngredientEntity>
 }

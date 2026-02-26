@@ -22,31 +22,41 @@ class Ingredient(context: Context) {
         dateEntered: Int,
         dateLastUpdated: Int
     ) {
-        // Check if ingredient exists
-        val existing = ingredientDao.getAllIngredients().find { it.name.equals(name, ignoreCase = true) }
+        val existing = ingredientDao.getIngredientByName(name)
 
         if (existing != null) {
-            // Update existing ingredient
+
             val newQuantity = existing.quantity + quantity
             val newPrice = existing.price + price
+
+            val newAllTimeQuantity = existing.allTimeQuantity + quantity
+            val newAllTimePrice = existing.allTimePrice + price
+
             val updatedIngredient = existing.copy(
                 quantity = newQuantity,
                 price = newPrice,
-                pricePerUnit = pricePerUnit,
+                allTimeQuantity = newAllTimeQuantity,
+                allTimePrice = newAllTimePrice,
+                pricePerUnit = newPrice / newQuantity,
                 dateLastUpdated = dateLastUpdated
             )
+
             ingredientDao.update(updatedIngredient)
+
         } else {
-            // Insert new ingredient
+
             val ingredient = IngredientEntity(
                 name = name,
                 quantity = quantity,
                 unit = unit,
                 price = price,
                 pricePerUnit = pricePerUnit,
+                allTimeQuantity = quantity,
+                allTimePrice = price,
                 dateEntered = dateEntered,
                 dateLastUpdated = dateLastUpdated
             )
+
             ingredientDao.insert(ingredient)
         }
     }
@@ -55,6 +65,27 @@ class Ingredient(context: Context) {
         return ingredientDao.getIngredientByName(name)
     }
 
+    suspend fun updateIngredient(updatedIngredient: IngredientEntity) {
+
+        val existing = ingredientDao.getIngredientById(updatedIngredient.id)
+            ?: return
+
+        val deltaQuantity = updatedIngredient.quantity - existing.quantity
+        val deltaPrice = updatedIngredient.price - existing.price
+
+        val newAllTimeQuantity = existing.allTimeQuantity + deltaQuantity
+        val newAllTimePrice = existing.allTimePrice + deltaPrice
+
+        val finalIngredient = updatedIngredient.copy(
+            allTimeQuantity = newAllTimeQuantity,
+            allTimePrice = newAllTimePrice,
+            pricePerUnit = if (updatedIngredient.quantity > 0)
+                updatedIngredient.price / updatedIngredient.quantity
+            else 0.0
+        )
+
+        ingredientDao.update(finalIngredient)
+    }
     suspend fun getIngredientById(id: Long): IngredientEntity? {
         return ingredientDao.getAllIngredients().find { it.id == id }
     }

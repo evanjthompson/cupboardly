@@ -46,12 +46,19 @@ class IngredientViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    suspend fun getIngredientByName(name: String): IngredientEntity? {
+        suspend fun getIngredientByName(name: String): IngredientEntity? {
         return ingredientWrapper.getIngredientByName(name)
     }
 
     suspend fun getIngredientById(id: Long): IngredientEntity? {
         return ingredientWrapper.getIngredientById(id)
+    }
+
+    fun updateIngredient(updatedIngredient: IngredientEntity) {
+        viewModelScope.launch {
+            ingredientWrapper.updateIngredient(updatedIngredient)
+            _ingredients.value = ingredientWrapper.getAll()
+        }
     }
 
     fun deleteIngredient(ingredient: IngredientEntity) {

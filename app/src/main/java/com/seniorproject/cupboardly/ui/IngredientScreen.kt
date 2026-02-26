@@ -40,7 +40,8 @@ fun IngredientScreen(
 
     val ingredients by viewModel.ingredients.collectAsState(initial = emptyList())
 
-    var showDialog by remember { mutableStateOf(false) }
+    // variable to indicate a new ingredient is to be added
+    var showAddNew by remember { mutableStateOf(false) }
 
     // Input states
     var name by remember { mutableStateOf("") }
@@ -117,7 +118,28 @@ fun IngredientScreen(
                         key = { it.id }
                     ) { ingredient ->
 
+                        // UI state for each ingredient
                         var expanded by remember { mutableStateOf(false) }
+                        var isEditing by remember { mutableStateOf(false) }
+                        var isAddingMore by remember { mutableStateOf(false) }
+
+                        // Error states
+                        var editNameError by remember { mutableStateOf<String?>(null) }
+                        var editQuantityError by remember { mutableStateOf<String?>(null) }
+                        var editPriceError by remember { mutableStateOf<String?>(null) }
+
+                        var addMoreQuantityError by remember { mutableStateOf<String?>(null) }
+                        var addMorePriceError by remember { mutableStateOf<String?>(null) }
+
+                        // Values for editing
+                        var editName by remember { mutableStateOf(ingredient.name) }
+                        var editQuantity by remember { mutableStateOf(ingredient.quantity.toString()) }
+                        var editUnit by remember { mutableStateOf(ingredient.unit) }
+                        var editPrice by remember { mutableStateOf(ingredient.price.toString()) }
+
+                        // Values for adding more
+                        var addMoreQuantity by remember { mutableStateOf("") }
+                        var addMorePrice by remember { mutableStateOf("") }
 
                         Surface(
                             shape = RoundedCornerShape(10.dp),
@@ -130,56 +152,239 @@ fun IngredientScreen(
                                 .animateContentSize()
                                 .clickable { expanded = !expanded }
                         ) {
-
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(16.dp)
                             ) {
 
-                                // Always visible row
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
+                                // Collapsed title
+                                if (!isEditing && !isAddingMore) {
                                     Text("${ingredient.name} ${ingredient.quantity} ${ingredient.unit}")
+                                } else {
+                                    Text(ingredient.name) // only show name when editing or adding more
                                 }
 
                                 if (expanded) {
+                                    when {
+                                        isAddingMore -> {
+                                            Spacer(modifier = Modifier.height(8.dp))
 
-                                    Spacer(modifier = Modifier.height(8.dp))
+                                            OutlinedTextField(
+                                                value = addMoreQuantity,
+                                                onValueChange = { addMoreQuantity = it; addMoreQuantityError = null },
+                                                label = { Text("Add Quantity") },
+                                                isError = addMoreQuantityError != null,
+                                                supportingText = { addMoreQuantityError?.let { Text(it, color = MaterialTheme.colorScheme.error) } },
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
 
-                                    Text("Total Price: $${ingredient.price}")
-                                    Text("Price per Unit: $${"%.2f".format(ingredient.pricePerUnit)} per ${ingredient.unit}")
-                                    Text("Date Entered: ${sdf.format(Date(ingredient.dateEntered * 1000L))}")
-                                    Text("Date Last Updated: ${sdf.format(Date(ingredient.dateLastUpdated * 1000L))}")
+                                            OutlinedTextField(
+                                                value = addMorePrice,
+                                                onValueChange = { addMorePrice = it; addMorePriceError = null },
+                                                label = { Text("Price of Additional Quantity") },
+                                                isError = addMorePriceError != null,
+                                                supportingText = { addMorePriceError?.let { Text(it, color = MaterialTheme.colorScheme.error) } },
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
 
-                                    Spacer(modifier = Modifier.height(12.dp))
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Button(
+                                                    onClick = {
+                                                        // Cancel Add More
+                                                        addMoreQuantity = ""
+                                                        addMorePrice = ""
+                                                        addMoreQuantityError = null
+                                                        addMorePriceError = null
+                                                        isAddingMore = false
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = gold),
+                                                    modifier = Modifier.weight(1f)
+                                                ) { Text("Cancel") }
 
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp) // space between buttons
-                                    ) {
-                                        Button(
-                                            onClick = {  },
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = gold,
-                                                contentColor = Color.White
-                                            ),
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Text("Add More")
+                                                Button(
+                                                    onClick = {
+                                                        // Validate
+                                                        val quantityValue = addMoreQuantity.toDoubleOrNull()
+                                                        val priceValue = addMorePrice.toDoubleOrNull()
+                                                        var valid = true
+
+                                                        if (quantityValue == null || quantityValue <= 0) {
+                                                            addMoreQuantityError = "Quantity must be > 0"
+                                                            valid = false
+                                                        }
+                                                        if (priceValue == null || priceValue < 0) {
+                                                            addMorePriceError = "Price cannot be negative"
+                                                            valid = false
+                                                        }
+
+                                                        if (valid) {
+                                                            val currentDate = (System.currentTimeMillis() / 1000).toInt()
+                                                            val newQuantity = ingredient.quantity + quantityValue!!
+                                                            val newPrice = ingredient.price + priceValue!!
+                                                            val newPricePerUnit = newPrice / newQuantity
+
+                                                            val updatedIngredient = ingredient.copy(
+                                                                quantity = newQuantity,
+                                                                price = newPrice,
+                                                                pricePerUnit = newPricePerUnit,
+                                                                allTimeQuantity = ingredient.allTimeQuantity + quantityValue,
+                                                                allTimePrice = ingredient.allTimePrice + priceValue,
+                                                                dateLastUpdated = currentDate
+                                                            )
+
+                                                            viewModel.updateIngredient(updatedIngredient)
+
+                                                            // Reset Add More state
+                                                            addMoreQuantity = ""
+                                                            addMorePrice = ""
+                                                            isAddingMore = false
+                                                        }
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = gold),
+                                                    modifier = Modifier.weight(1f)
+                                                ) { Text("Confirm") }
+                                            }
                                         }
 
-                                        Button(
-                                            onClick = { viewModel.deleteIngredient(ingredient) },
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = gold,
-                                                contentColor = Color.White
-                                            ),
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Text("Edit")
+                                        isEditing -> {
+                                            Spacer(modifier = Modifier.height(8.dp))
+
+                                            OutlinedTextField(
+                                                value = editName,
+                                                onValueChange = { editName = it; editNameError = null },
+                                                label = { Text("Name (currently ${ingredient.name})") },
+                                                isError = editNameError != null,
+                                                supportingText = { editNameError?.let { Text(it, color = MaterialTheme.colorScheme.error) } },
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+
+                                            OutlinedTextField(
+                                                value = editQuantity,
+                                                onValueChange = { editQuantity = it; editQuantityError = null },
+                                                label = { Text("Quantity (currently ${ingredient.quantity})") },
+                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                isError = editQuantityError != null,
+                                                supportingText = { editQuantityError?.let { Text(it, color = MaterialTheme.colorScheme.error) } },
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+
+                                            OutlinedTextField(
+                                                value = editUnit,
+                                                onValueChange = { editUnit = it },
+                                                label = { Text("Unit (currently ${ingredient.unit})") },
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+
+                                            OutlinedTextField(
+                                                value = editPrice,
+                                                onValueChange = { editPrice = it; editPriceError = null },
+                                                label = { Text("Price (currently ${ingredient.price})") },
+                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                isError = editPriceError != null,
+                                                supportingText = { editPriceError?.let { Text(it, color = MaterialTheme.colorScheme.error) } },
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Button(
+                                                    onClick = { isEditing = false },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = gold),
+                                                    modifier = Modifier.weight(1f)
+                                                ) { Text("Cancel") }
+
+                                                Button(
+                                                    onClick = {
+                                                        val trimmedName = editName.trim()
+                                                        val quantityValue = editQuantity.toDoubleOrNull()
+                                                        val priceValue = editPrice.toDoubleOrNull()
+                                                        var valid = true
+
+                                                        if (trimmedName.isBlank()) { editNameError = "Enter a name"; valid = false }
+                                                        if (quantityValue == null || quantityValue <= 0) { editQuantityError = "Quantity > 0"; valid = false }
+                                                        if (priceValue == null || priceValue < 0) { editPriceError = "Price >= 0"; valid = false }
+
+                                                        // Check name uniqueness
+                                                        if (ingredients.any { it.id != ingredient.id && it.name.equals(trimmedName, ignoreCase = true) }) {
+                                                            editNameError = "Name already exists"
+                                                            valid = false
+                                                        }
+
+                                                        if (valid) {
+                                                            val currentDate = (System.currentTimeMillis() / 1000).toInt()
+                                                            val oldQuantity = ingredient.quantity
+                                                            val oldPrice = ingredient.price
+
+                                                            val deltaQuantity = quantityValue!! - oldQuantity
+                                                            val deltaPrice = priceValue!! - oldPrice
+
+                                                            val updatedIngredient = ingredient.copy(
+                                                                name = trimmedName,
+                                                                quantity = quantityValue,
+                                                                unit = editUnit,
+                                                                price = priceValue,
+                                                                pricePerUnit = priceValue / quantityValue,
+                                                                allTimeQuantity = ingredient.allTimeQuantity + deltaQuantity,
+                                                                allTimePrice = ingredient.allTimePrice + deltaPrice,
+                                                                dateLastUpdated = currentDate
+                                                            )
+
+                                                            viewModel.updateIngredient(updatedIngredient)
+                                                            isEditing = false
+                                                        }
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = gold),
+                                                    modifier = Modifier.weight(1f)
+                                                ) { Text("Confirm") }
+                                            }
+                                        }
+
+                                        else -> {
+                                            // Normal expanded view
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text("Total Price: $${ingredient.price}")
+                                            Text("Price per Unit: $${"%.2f".format(ingredient.pricePerUnit)} per ${ingredient.unit}")
+                                            Text("Date Entered: ${sdf.format(Date(ingredient.dateEntered * 1000L))}")
+                                            Text("Date Last Updated: ${sdf.format(Date(ingredient.dateLastUpdated * 1000L))}")
+                                            Spacer(modifier = Modifier.height(5.dp))
+                                            Text("Total Tracked All Time: ${ingredient.allTimeQuantity}")
+                                            Text("Total Cost All Time: $${ingredient.allTimePrice}")
+
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Button(
+                                                    onClick = {
+                                                        isAddingMore = true
+                                                        isEditing = false
+                                                        addMoreQuantity = ""
+                                                        addMorePrice = ""
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = gold),
+                                                    modifier = Modifier.weight(1f)
+                                                ) { Text("Add More") }
+
+                                                Button(
+                                                    onClick = {
+                                                        isEditing = true
+                                                        isAddingMore = false
+                                                        editName = ingredient.name
+                                                        editQuantity = ingredient.quantity.toString()
+                                                        editUnit = ingredient.unit
+                                                        editPrice = ingredient.price.toString()
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = gold),
+                                                    modifier = Modifier.weight(1f)
+                                                ) { Text("Edit") }
+                                            }
                                         }
                                     }
                                 }
@@ -190,7 +395,7 @@ fun IngredientScreen(
             }
                 // Floating Add Button
                 Button(
-                    onClick = { showDialog = true },
+                    onClick = { showAddNew = true },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(35.dp)
@@ -203,7 +408,7 @@ fun IngredientScreen(
                     Text("+", fontSize = 32.sp)
                 }
 
-                if (showDialog) {
+                if (showAddNew) {
 
                     var expanded by remember { mutableStateOf(false) }
 
@@ -213,7 +418,7 @@ fun IngredientScreen(
                     }
 
                     AlertDialog(
-                        onDismissRequest = { showDialog = false },
+                        onDismissRequest = { showAddNew = false },
 
                         confirmButton = {
                             Button(onClick = {
@@ -274,7 +479,7 @@ fun IngredientScreen(
                                 quantity = ""
                                 unit = ""
                                 price = ""
-                                showDialog = false
+                                showAddNew = false
 
                             }) {
                                 Text("Add")
@@ -282,7 +487,7 @@ fun IngredientScreen(
                         },
 
                         dismissButton = {
-                            Button(onClick = { showDialog = false }) {
+                            Button(onClick = { showAddNew = false }) {
                                 Text("Cancel")
                             }
                         },
