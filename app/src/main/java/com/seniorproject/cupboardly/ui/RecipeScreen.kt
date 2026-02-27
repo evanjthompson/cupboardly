@@ -7,6 +7,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -126,23 +128,6 @@ fun RecipeScreen(
                                     sdf.format(Date(recipe.dateCreated * 1000L))
                                 }")
                                 Text("Times Followed: ${recipe.numTimesFollowed}")
-
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-
-                                    Button(
-                                        onClick = { },
-                                        modifier = Modifier.weight(1f)
-                                    ) { Text("Follow") }
-
-                                    Button(
-                                        onClick = {
-                                            viewModel.deleteRecipe(recipe)
-                                        },
-                                        modifier = Modifier.weight(1f)
-                                    ) { Text("Edit") }
-                                }
                             }
                         }
                     }
@@ -163,9 +148,8 @@ fun RecipeScreen(
 
             var name by remember { mutableStateOf("") }
             var instructions by remember { mutableStateOf("") }
-            var nameError by remember { mutableStateOf(false) }
             var newIngredientName by remember { mutableStateOf("") }
-
+            var nameError by remember { mutableStateOf(false) }
             val selectedIngredients = remember { mutableStateMapOf<Long, String>() }
 
             AlertDialog(
@@ -173,7 +157,15 @@ fun RecipeScreen(
                 title = { Text("Add New Recipe") },
 
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    val scrollState = rememberScrollState()
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 500.dp)
+                            .verticalScroll(scrollState),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
 
                         OutlinedTextField(
                             value = name,
@@ -196,7 +188,6 @@ fun RecipeScreen(
                         Text("Add New Ingredient", fontWeight = FontWeight.Bold)
 
                         Row {
-
                             OutlinedTextField(
                                 value = newIngredientName,
                                 onValueChange = { newIngredientName = it },
@@ -207,9 +198,7 @@ fun RecipeScreen(
                             Spacer(modifier = Modifier.width(8.dp))
 
                             Button(onClick = {
-
                                 if (newIngredientName.isBlank()) return@Button
-
                                 coroutineScope.launch {
 
                                     val currentDate =
@@ -236,7 +225,6 @@ fun RecipeScreen(
 
                                     newIngredientName = ""
                                 }
-
                             }) {
                                 Text("Add")
                             }
@@ -249,10 +237,8 @@ fun RecipeScreen(
                         LazyColumn(
                             modifier = Modifier
                                 .height(250.dp)
-                                .fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                .fillMaxWidth()
                         ) {
-
                             items(allIngredients, key = { it.id }) { ingredient ->
 
                                 val isSelected =
@@ -274,14 +260,11 @@ fun RecipeScreen(
                                     )
 
                                     Text(
-                                        text = ingredient.name,
+                                        ingredient.name,
                                         modifier = Modifier.weight(1f)
                                     )
 
                                     if (isSelected) {
-
-                                        Spacer(modifier = Modifier.width(8.dp))
-
                                         OutlinedTextField(
                                             value = selectedIngredients[ingredient.id] ?: "",
                                             onValueChange = {
@@ -321,12 +304,9 @@ fun RecipeScreen(
                             selectedIngredients.forEach { (id, qtyString) ->
                                 val qty =
                                     qtyString.toDoubleOrNull() ?: 0.0
-
                                 if (qty > 0) {
                                     viewModel.addIngredientToRecipe(
-                                        recipeId,
-                                        id,
-                                        qty
+                                        recipeId, id, qty
                                     )
                                 }
                             }
