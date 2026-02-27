@@ -35,12 +35,11 @@ fun RecipeScreen(
 ) {
 
     val recipes by viewModel.recipes.collectAsState()
+    val allIngredients by ingredientViewModel.ingredients.collectAsState(initial = emptyList())
     val coroutineScope = rememberCoroutineScope()
 
     val sdf = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
-
     val recipeIngredientsMap = remember { mutableStateMapOf<Long, String>() }
-
     var showAddDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(recipes) {
@@ -64,7 +63,7 @@ fun RecipeScreen(
 
         Image(
             painter = painterResource(id = R.drawable.striperecipebg),
-            contentDescription = "Recipe Background",
+            contentDescription = null,
             contentScale = ContentScale.FillBounds,
             modifier = Modifier.matchParentSize()
         )
@@ -82,28 +81,15 @@ fun RecipeScreen(
 
                 Button(
                     onClick = onGoToIngredients,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.DarkGray,
-                        contentColor = Color.White
-                    )
-                ) {
-                    Text("Ingredients")
-                }
+                    modifier = Modifier.weight(1f)
+                ) { Text("Ingredients") }
 
                 Button(
                     onClick = {},
                     modifier = Modifier.weight(2f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = darkBlue,
-                        contentColor = Color.White
-                    )
+                    colors = ButtonDefaults.buttonColors(containerColor = darkBlue)
                 ) {
-                    Text(
-                        "Recipes",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("Recipes", fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -129,56 +115,33 @@ fun RecipeScreen(
 
                         Column(modifier = Modifier.padding(16.dp)) {
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(recipe.name)
-                            }
+                            Text(recipe.name)
 
                             if (expanded) {
 
                                 Spacer(modifier = Modifier.height(8.dp))
-
                                 Text("Ingredients: $ingredientText")
                                 Text("Instructions: ${recipe.instructions}")
                                 Text("Date Created: ${
-                                    sdf.format(
-                                        Date(recipe.dateCreated * 1000L)
-                                    )
+                                    sdf.format(Date(recipe.dateCreated * 1000L))
                                 }")
                                 Text("Times Followed: ${recipe.numTimesFollowed}")
 
                                 Spacer(modifier = Modifier.height(12.dp))
 
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
 
                                     Button(
                                         onClick = { },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = darkBlue,
-                                            contentColor = Color.White
-                                        ),
                                         modifier = Modifier.weight(1f)
-                                    ) {
-                                        Text("Follow")
-                                    }
+                                    ) { Text("Follow") }
 
                                     Button(
                                         onClick = {
                                             viewModel.deleteRecipe(recipe)
                                         },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = darkBlue,
-                                            contentColor = Color.White
-                                        ),
                                         modifier = Modifier.weight(1f)
-                                    ) {
-                                        Text("Edit")
-                                    }
+                                    ) { Text("Edit") }
                                 }
                             }
                         }
@@ -193,13 +156,8 @@ fun RecipeScreen(
                 .align(Alignment.BottomEnd)
                 .padding(35.dp)
                 .size(64.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = gold,
-                contentColor = Color.White
-            )
-        ) {
-            Text("+", fontSize = 32.sp)
-        }
+            colors = ButtonDefaults.buttonColors(containerColor = gold)
+        ) { Text("+", fontSize = 32.sp) }
 
         if (showAddDialog) {
 
@@ -207,9 +165,12 @@ fun RecipeScreen(
             var instructions by remember { mutableStateOf("") }
             var nameError by remember { mutableStateOf(false) }
 
+            var newIngredientName by remember { mutableStateOf("") }
+
+            val selectedIngredients = remember { mutableStateMapOf<Long, String>() }
+
             AlertDialog(
                 onDismissRequest = { showAddDialog = false },
-
                 title = { Text("Add New Recipe") },
 
                 text = {
@@ -222,60 +183,157 @@ fun RecipeScreen(
                                 nameError = false
                             },
                             label = { Text("Recipe Name") },
-                            isError = nameError,
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
+                            isError = nameError
                         )
-
-                        if (nameError) {
-                            Text(
-                                "Recipe name is required",
-                                color = Color.Red,
-                                fontSize = 12.sp
-                            )
-                        }
 
                         OutlinedTextField(
                             value = instructions,
                             onValueChange = { instructions = it },
-                            label = { Text("Instructions") },
-                            modifier = Modifier.fillMaxWidth(),
-                            maxLines = 5
+                            label = { Text("Instructions") }
                         )
+
+                        Divider()
+
+                        Text("Add New Ingredient", fontWeight = FontWeight.Bold)
+
+                        Row {
+                            OutlinedTextField(
+                                value = newIngredientName,
+                                onValueChange = { newIngredientName = it },
+                                label = { Text("Ingredient Name") },
+                                modifier = Modifier.weight(1f)
+                            )
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            Button(onClick = {
+
+                                if (newIngredientName.isBlank()) return@Button
+
+                                coroutineScope.launch {
+
+                                    val currentDate =
+                                        (System.currentTimeMillis() / 1000).toInt()
+
+                                    ingredientViewModel.addIngredient(
+                                        name = newIngredientName.trim(),
+                                        quantity = 0.0,
+                                        unit = "",
+                                        price = 0.0,
+                                        pricePerUnit = 0.0,
+                                        dateEntered = currentDate,
+                                        dateLastUpdated = currentDate
+                                    )
+
+                                    val created =
+                                        ingredientViewModel.getIngredientByName(
+                                            newIngredientName.trim()
+                                        )
+
+                                    created?.let {
+                                        selectedIngredients[it.id] = "1.0"
+                                    }
+
+                                    newIngredientName = ""
+                                }
+
+                            }) {
+                                Text("Add")
+                            }
+                        }
+
+                        Divider()
+
+                        Text("Select Ingredients", fontWeight = FontWeight.Bold)
+
+                        Column(
+                            modifier = Modifier.heightIn(max = 200.dp)
+                        ) {
+                            allIngredients.forEach { ingredient ->
+
+                                val isSelected =
+                                    selectedIngredients.containsKey(ingredient.id)
+
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+
+                                    Checkbox(
+                                        checked = isSelected,
+                                        onCheckedChange = { checked ->
+                                            if (checked)
+                                                selectedIngredients[ingredient.id] = "1.0"
+                                            else
+                                                selectedIngredients.remove(ingredient.id)
+                                        }
+                                    )
+
+                                    Text(ingredient.name)
+
+                                    if (isSelected) {
+
+                                        Spacer(modifier = Modifier.width(8.dp))
+
+                                        OutlinedTextField(
+                                            value = selectedIngredients[ingredient.id] ?: "",
+                                            onValueChange = {
+                                                selectedIngredients[ingredient.id] = it
+                                            },
+                                            label = { Text("Qty") },
+                                            modifier = Modifier.width(80.dp),
+                                            singleLine = true
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 },
 
                 confirmButton = {
-                    Button(
-                        onClick = {
-                            if (name.isBlank()) {
-                                nameError = true
-                                return@Button
-                            }
+                    Button(onClick = {
 
-                            coroutineScope.launch {
-                                val currentDate =
-                                    (System.currentTimeMillis() / 1000).toInt()
+                        if (name.isBlank()) {
+                            nameError = true
+                            return@Button
+                        }
 
+                        coroutineScope.launch {
+
+                            val currentDate =
+                                (System.currentTimeMillis() / 1000).toInt()
+
+                            val recipeId =
                                 viewModel.addRecipeAndReturnId(
-                                    name = name.trim(),
-                                    instructions = instructions.trim(),
-                                    dateCreated = currentDate
+                                    name.trim(),
+                                    instructions.trim(),
+                                    currentDate
                                 )
 
-                                viewModel.refresh()
-                                showAddDialog = false
+                            selectedIngredients.forEach { (id, qtyString) ->
+                                val qty =
+                                    qtyString.toDoubleOrNull() ?: 0.0
+
+                                if (qty > 0) {
+                                    viewModel.addIngredientToRecipe(
+                                        recipeId,
+                                        id,
+                                        qty
+                                    )
+                                }
                             }
+
+                            viewModel.refresh()
+                            showAddDialog = false
                         }
-                    ) {
+
+                    }) {
                         Text("Save")
                     }
                 },
 
                 dismissButton = {
-                    Button(
-                        onClick = { showAddDialog = false }
-                    ) {
+                    Button(onClick = { showAddDialog = false }) {
                         Text("Cancel")
                     }
                 }
