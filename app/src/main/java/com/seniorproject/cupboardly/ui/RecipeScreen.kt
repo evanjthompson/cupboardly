@@ -164,7 +164,6 @@ fun RecipeScreen(
             var name by remember { mutableStateOf("") }
             var instructions by remember { mutableStateOf("") }
             var nameError by remember { mutableStateOf(false) }
-
             var newIngredientName by remember { mutableStateOf("") }
 
             val selectedIngredients = remember { mutableStateMapOf<Long, String>() }
@@ -197,6 +196,7 @@ fun RecipeScreen(
                         Text("Add New Ingredient", fontWeight = FontWeight.Bold)
 
                         Row {
+
                             OutlinedTextField(
                                 value = newIngredientName,
                                 onValueChange = { newIngredientName = it },
@@ -246,16 +246,21 @@ fun RecipeScreen(
 
                         Text("Select Ingredients", fontWeight = FontWeight.Bold)
 
-                        Column(
-                            modifier = Modifier.heightIn(max = 200.dp)
+                        LazyColumn(
+                            modifier = Modifier
+                                .height(250.dp)
+                                .fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            allIngredients.forEach { ingredient ->
+
+                            items(allIngredients, key = { it.id }) { ingredient ->
 
                                 val isSelected =
                                     selectedIngredients.containsKey(ingredient.id)
 
                                 Row(
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
 
                                     Checkbox(
@@ -268,7 +273,10 @@ fun RecipeScreen(
                                         }
                                     )
 
-                                    Text(ingredient.name)
+                                    Text(
+                                        text = ingredient.name,
+                                        modifier = Modifier.weight(1f)
+                                    )
 
                                     if (isSelected) {
 
