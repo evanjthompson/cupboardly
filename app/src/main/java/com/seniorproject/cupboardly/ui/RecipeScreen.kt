@@ -178,12 +178,44 @@ fun RecipeScreen(
         Button(
             onClick = {
                 coroutineScope.launch {
+
                     val currentDate = (System.currentTimeMillis() / 1000).toInt()
-                    val recipeId: Long = viewModel.addRecipeAndReturnId(
+
+                    // Insert Recipe
+                    val recipeId = viewModel.addRecipeAndReturnId(
                         name = "Cupcakes",
                         instructions = "Mix ingredients and bake at 350°F for 20 minutes.",
                         dateCreated = currentDate
                     )
+
+                    // Try to get ingredient
+                    var milk = ingredientViewModel.getIngredientByName("Milk")
+
+                    // If it doesn't exist, create it
+                    if (milk == null) {
+                        ingredientViewModel.addIngredient(
+                            name = "Milk",
+                            quantity = 0.0,
+                            unit = "",
+                            price = 0.0,
+                            pricePerUnit = 0.0,
+                            dateEntered = currentDate,
+                            dateLastUpdated = currentDate
+                        )
+
+                        // Re-fetch to get generated ID
+                        milk = ingredientViewModel.getIngredientByName("Milk")
+                    }
+
+                    // Now link safely
+                    milk?.let {
+                        viewModel.addIngredientToRecipe(
+                            recipeId = recipeId,
+                            ingredientId = it.id,
+                            quantityUsed = 1.0
+                        )
+                    }
+
                     viewModel.refresh()
                 }
             },

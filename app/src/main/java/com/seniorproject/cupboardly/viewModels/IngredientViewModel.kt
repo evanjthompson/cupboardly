@@ -46,7 +46,7 @@ class IngredientViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-        suspend fun getIngredientByName(name: String): IngredientEntity? {
+    suspend fun getIngredientByName(name: String): IngredientEntity? {
         return ingredientWrapper.getIngredientByName(name)
     }
 

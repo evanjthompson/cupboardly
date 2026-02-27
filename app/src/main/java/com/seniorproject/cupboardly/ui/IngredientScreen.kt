@@ -361,6 +361,15 @@ fun IngredientScreen(
                                                     colors = ButtonDefaults.buttonColors(containerColor = gold),
                                                     modifier = Modifier.weight(1f)
                                                 ) { Text("Confirm") }
+
+                                                Button(
+                                                    onClick = {
+                                                        viewModel.deleteIngredient(ingredient)
+                                                        isEditing = false
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                                                    modifier = Modifier.weight(0.75f)
+                                                ) { Text("Delete") }
                                             }
                                         }
 
@@ -404,6 +413,7 @@ fun IngredientScreen(
                                                     colors = ButtonDefaults.buttonColors(containerColor = gold),
                                                     modifier = Modifier.weight(1f)
                                                 ) { Text("Edit") }
+
                                             }
                                         }
                                     }
