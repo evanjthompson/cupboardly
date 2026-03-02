@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "893030708667",
+    "project_id": "cupboardly-app",
+    "storage_bucket": "cupboardly-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:893030708667:android:986113204bcab8f167009e",
+        "android_client_info": {
+          "package_name": "com.seniorproject.cupboardly"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBYHlCL9eag1aXef_YEKaOIWZ4lrasCC2U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
