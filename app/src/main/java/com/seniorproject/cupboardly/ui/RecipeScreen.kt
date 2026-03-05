@@ -52,8 +52,7 @@ fun RecipeScreen(
                     val ingredient = ingredientViewModel.getIngredientById(link.ingredientId)
                     ingredient?.let { "${link.quantityUsed} ${it.name}" }
                 }
-                recipeIngredientsMap[recipe.id] =
-                    ingredientsWithQuantities.joinToString(", ")
+                recipeIngredientsMap[recipe.id] = ingredientsWithQuantities.joinToString(", ")
             }
         }
     }
@@ -100,9 +99,8 @@ fun RecipeScreen(
             LazyColumn {
                 items(recipes, key = { it.id }) { recipe ->
 
-                    var expanded by remember { mutableStateOf(false) }
-                    val ingredientText =
-                        recipeIngredientsMap[recipe.id] ?: "Loading..."
+                    var expanded by remember(recipe.id) { mutableStateOf(false) }
+                    val ingredientText = recipeIngredientsMap[recipe.id] ?: "Loading..."
 
                     Surface(
                         shape = RoundedCornerShape(10.dp),
@@ -124,9 +122,7 @@ fun RecipeScreen(
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text("Ingredients: $ingredientText")
                                 Text("Instructions: ${recipe.instructions}")
-                                Text("Date Created: ${
-                                    sdf.format(Date(recipe.dateCreated * 1000L))
-                                }")
+                                Text("Date Created: ${sdf.format(Date(recipe.dateCreated * 1000L))}")
                                 Text("Times Followed: ${recipe.numTimesFollowed}")
                             }
                         }
@@ -200,10 +196,9 @@ fun RecipeScreen(
                             Button(onClick = {
                                 if (newIngredientName.isBlank()) return@Button
                                 coroutineScope.launch {
+                                    val currentDate = (System.currentTimeMillis() / 1000).toInt()
 
-                                    val currentDate =
-                                        (System.currentTimeMillis() / 1000).toInt()
-
+                                    // Add ingredient with quantity 0
                                     ingredientViewModel.addIngredient(
                                         name = newIngredientName.trim(),
                                         quantity = 0.0,
@@ -214,14 +209,8 @@ fun RecipeScreen(
                                         dateLastUpdated = currentDate
                                     )
 
-                                    val created =
-                                        ingredientViewModel.getIngredientByName(
-                                            newIngredientName.trim()
-                                        )
-
-                                    created?.let {
-                                        selectedIngredients[it.id] = "1.0"
-                                    }
+                                    val created = ingredientViewModel.getIngredientByName(newIngredientName.trim())
+                                    created?.let { selectedIngredients[it.id] = "1.0" }
 
                                     newIngredientName = ""
                                 }
@@ -241,8 +230,7 @@ fun RecipeScreen(
                         ) {
                             items(allIngredients, key = { it.id }) { ingredient ->
 
-                                val isSelected =
-                                    selectedIngredients.containsKey(ingredient.id)
+                                val isSelected = selectedIngredients.containsKey(ingredient.id)
 
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -252,17 +240,12 @@ fun RecipeScreen(
                                     Checkbox(
                                         checked = isSelected,
                                         onCheckedChange = { checked ->
-                                            if (checked)
-                                                selectedIngredients[ingredient.id] = "1.0"
-                                            else
-                                                selectedIngredients.remove(ingredient.id)
+                                            if (checked) selectedIngredients[ingredient.id] = "1.0"
+                                            else selectedIngredients.remove(ingredient.id)
                                         }
                                     )
 
-                                    Text(
-                                        ingredient.name,
-                                        modifier = Modifier.weight(1f)
-                                    )
+                                    Text(ingredient.name, modifier = Modifier.weight(1f))
 
                                     if (isSelected) {
                                         OutlinedTextField(
@@ -283,47 +266,52 @@ fun RecipeScreen(
 
                 confirmButton = {
                     Button(onClick = {
-
                         if (name.isBlank()) {
                             nameError = true
                             return@Button
                         }
 
                         coroutineScope.launch {
+                            val currentDate = (System.currentTimeMillis() / 1000).toInt()
 
-                            val currentDate =
-                                (System.currentTimeMillis() / 1000).toInt()
+                            val recipeId = viewModel.addRecipeAndReturnId(
+                                name.trim(),
+                                instructions.trim(),
+                                currentDate
+                            )
 
-                            val recipeId =
-                                viewModel.addRecipeAndReturnId(
-                                    name.trim(),
-                                    instructions.trim(),
-                                    currentDate
-                                )
-
+                            // --- Save ingredients and auto-create missing ones ---
                             selectedIngredients.forEach { (id, qtyString) ->
-                                val qty =
-                                    qtyString.toDoubleOrNull() ?: 0.0
+                                val qty = qtyString.toDoubleOrNull() ?: 0.0
                                 if (qty > 0) {
-                                    viewModel.addIngredientToRecipe(
-                                        recipeId, id, qty
-                                    )
+
+                                    var ingredient = ingredientViewModel.getIngredientById(id)
+                                    if (ingredient == null) {
+                                        // Missing ingredient — create it
+                                        ingredientViewModel.addIngredient(
+                                            name = allIngredients.find { it.id == id }?.name ?: "Unknown",
+                                            quantity = 0.0,
+                                            unit = "",
+                                            price = 0.0,
+                                            pricePerUnit = 0.0,
+                                            dateEntered = currentDate,
+                                            dateLastUpdated = currentDate
+                                        )
+                                        ingredient = ingredientViewModel.getIngredientById(id)
+                                    }
+
+                                    ingredient?.let { viewModel.addIngredientToRecipe(recipeId, it.id, qty) }
                                 }
                             }
 
                             viewModel.refresh()
                             showAddDialog = false
                         }
-
-                    }) {
-                        Text("Save")
-                    }
+                    }) { Text("Save") }
                 },
 
                 dismissButton = {
-                    Button(onClick = { showAddDialog = false }) {
-                        Text("Cancel")
-                    }
+                    Button(onClick = { showAddDialog = false }) { Text("Cancel") }
                 }
             )
         }
