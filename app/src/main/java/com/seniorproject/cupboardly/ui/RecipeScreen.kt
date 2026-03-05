@@ -146,6 +146,7 @@ fun RecipeScreen(
             var instructions by remember { mutableStateOf("") }
             var newIngredientName by remember { mutableStateOf("") }
             var nameError by remember { mutableStateOf(false) }
+            var ingredientError by remember { mutableStateOf<String?>(null) } // NEW
             val selectedIngredients = remember { mutableStateMapOf<Long, String>() }
 
             AlertDialog(
@@ -186,7 +187,10 @@ fun RecipeScreen(
                         Row {
                             OutlinedTextField(
                                 value = newIngredientName,
-                                onValueChange = { newIngredientName = it },
+                                onValueChange = {
+                                    newIngredientName = it
+                                    ingredientError = null
+                                },
                                 label = { Text("Ingredient Name") },
                                 modifier = Modifier.weight(1f)
                             )
@@ -194,13 +198,23 @@ fun RecipeScreen(
                             Spacer(modifier = Modifier.width(8.dp))
 
                             Button(onClick = {
-                                if (newIngredientName.isBlank()) return@Button
+                                val trimmedName = newIngredientName.trim()
+                                if (trimmedName.isBlank()) return@Button
+
                                 coroutineScope.launch {
+                                    // Check if ingredient already exists
+                                    val existing = ingredientViewModel.getIngredientByName(trimmedName)
+                                    if (existing != null) {
+                                        ingredientError = "Ingredient already exists"
+                                        return@launch
+                                    }
+
+                                    ingredientError = null
                                     val currentDate = (System.currentTimeMillis() / 1000).toInt()
 
                                     // Add ingredient with quantity 0
                                     ingredientViewModel.addIngredient(
-                                        name = newIngredientName.trim(),
+                                        name = trimmedName,
                                         quantity = 0.0,
                                         unit = "",
                                         price = 0.0,
@@ -209,7 +223,7 @@ fun RecipeScreen(
                                         dateLastUpdated = currentDate
                                     )
 
-                                    val created = ingredientViewModel.getIngredientByName(newIngredientName.trim())
+                                    val created = ingredientViewModel.getIngredientByName(trimmedName)
                                     created?.let { selectedIngredients[it.id] = "1.0" }
 
                                     newIngredientName = ""
@@ -217,6 +231,10 @@ fun RecipeScreen(
                             }) {
                                 Text("Add")
                             }
+                        }
+
+                        ingredientError?.let {
+                            Text(it, color = Color.Red, fontSize = 14.sp)
                         }
 
                         Divider()
@@ -280,14 +298,12 @@ fun RecipeScreen(
                                 currentDate
                             )
 
-                            // --- Save ingredients and auto-create missing ones ---
+                            // Save ingredients
                             selectedIngredients.forEach { (id, qtyString) ->
                                 val qty = qtyString.toDoubleOrNull() ?: 0.0
                                 if (qty > 0) {
-
                                     var ingredient = ingredientViewModel.getIngredientById(id)
                                     if (ingredient == null) {
-                                        // Missing ingredient — create it
                                         ingredientViewModel.addIngredient(
                                             name = allIngredients.find { it.id == id }?.name ?: "Unknown",
                                             quantity = 0.0,
@@ -299,7 +315,6 @@ fun RecipeScreen(
                                         )
                                         ingredient = ingredientViewModel.getIngredientById(id)
                                     }
-
                                     ingredient?.let { viewModel.addIngredientToRecipe(recipeId, it.id, qty) }
                                 }
                             }
