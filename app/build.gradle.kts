@@ -2,7 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.devtools.ksp)
-}
+    id("com.google.gms.google-services")}
 
 android {
     namespace = "com.seniorproject.cupboardly"
@@ -11,7 +11,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.cupboardly"
+        applicationId = "com.seniorproject.cupboardly"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -60,6 +60,9 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
+    implementation(platform("com.google.firebase:firebase-bom:34.9.0"))
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-ai")
     implementation("com.google.guava:guava:31.1-android") {
         exclude(group = "com.google.guava", module = "listenablefuture")
     }
