@@ -24,6 +24,8 @@ import com.seniorproject.cupboardly.R
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.ui.text.font.FontWeight
+import com.seniorproject.cupboardly.ai.askGeminiForDensity
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -34,6 +36,8 @@ fun IngredientScreen(
     viewModel: IngredientViewModel = viewModel(),
     onGoToRecipes: () -> Unit
 ) {
+
+    val scope = rememberCoroutineScope()
 
     val sdf = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
     val ingredients by viewModel.ingredients.collectAsState(initial = emptyList())

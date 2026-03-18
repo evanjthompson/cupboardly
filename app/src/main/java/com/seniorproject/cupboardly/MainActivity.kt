@@ -35,25 +35,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        // runGeminiTest()
-    }
-
-    private fun runGeminiTest() {
-        val generativeModel = Firebase.ai.generativeModel(modelName = "gemini-2.5-flash-lite")
-
-        lifecycleScope.launch {
-            try {
-                Log.d("GeminiTest", "Sending request to Gemini...")
-
-                val response = generativeModel.generateContent("Say 'System Online' if you can hear me.")
-
-                // Print the response to the Logcat console
-                Log.d("GeminiTest", "Response: ${response.text}")
-
-            } catch (e: Exception) {
-                Log.e("GeminiTest", "Error: ${e.message}", e)
-            }
-        }
     }
 }
 
