@@ -28,7 +28,9 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.seniorproject.cupboardly.classes.askGeminiForDensity
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecipeScreen(
     viewModel: RecipeViewModel = viewModel(),
@@ -50,7 +52,15 @@ fun RecipeScreen(
                 val links = viewModel.getIngredientsForRecipe(recipe.id)
                 val ingredientsWithQuantities = links.mapNotNull { link ->
                     val ingredient = ingredientViewModel.getIngredientById(link.ingredientId)
-                    ingredient?.let { "${link.quantityUsed} ${it.name}" }
+                    ingredient?.let {
+                        // convert from grams back to the unit it was entered in
+                        val displayQty = ingredientViewModel.convertFromGrams(
+                            link.quantityUsed,
+                            link.unitUsed,
+                            it.density
+                        )
+                        "${"%.2f".format(displayQty)} ${link.unitUsed} ${it.name}"
+                    }
                 }
                 recipeIngredientsMap[recipe.id] = ingredientsWithQuantities.joinToString(", ")
             }
@@ -146,8 +156,9 @@ fun RecipeScreen(
             var instructions by remember { mutableStateOf("") }
             var newIngredientName by remember { mutableStateOf("") }
             var nameError by remember { mutableStateOf(false) }
-            var ingredientError by remember { mutableStateOf<String?>(null) } // NEW
+            var ingredientError by remember { mutableStateOf<String?>(null) }
             val selectedIngredients = remember { mutableStateMapOf<Long, String>() }
+            val selectedUnits = remember { mutableStateMapOf<Long, String>() }
 
             AlertDialog(
                 onDismissRequest = { showAddDialog = false },
@@ -202,7 +213,6 @@ fun RecipeScreen(
                                 if (trimmedName.isBlank()) return@Button
 
                                 coroutineScope.launch {
-                                    // Check if ingredient already exists
                                     val existing = ingredientViewModel.getIngredientByName(trimmedName)
                                     if (existing != null) {
                                         ingredientError = "Ingredient already exists"
@@ -211,14 +221,14 @@ fun RecipeScreen(
 
                                     ingredientError = null
                                     val currentDate = (System.currentTimeMillis() / 1000).toInt()
+                                    val densityValue = askGeminiForDensity(trimmedName)
 
-                                    // Add ingredient with quantity 0
                                     ingredientViewModel.addIngredient(
                                         name = trimmedName,
                                         quantity = 0.0,
                                         unit = "",
+                                        density = densityValue,
                                         price = 0.0,
-                                        pricePerUnit = 0.0,
                                         dateEntered = currentDate,
                                         dateLastUpdated = currentDate
                                     )
@@ -246,9 +256,13 @@ fun RecipeScreen(
                                 .height(250.dp)
                                 .fillMaxWidth()
                         ) {
+
+                            val unitOptions = listOf("unit", "g", "kg", "oz", "lb", "ml", "cup", "tbsp", "tsp", "floz")
+
                             items(allIngredients, key = { it.id }) { ingredient ->
 
                                 val isSelected = selectedIngredients.containsKey(ingredient.id)
+                                var unitDropdownExpanded by remember { mutableStateOf(false) }
 
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -258,8 +272,13 @@ fun RecipeScreen(
                                     Checkbox(
                                         checked = isSelected,
                                         onCheckedChange = { checked ->
-                                            if (checked) selectedIngredients[ingredient.id] = "1.0"
-                                            else selectedIngredients.remove(ingredient.id)
+                                            if (checked) {
+                                                selectedIngredients[ingredient.id] = "1.0"
+                                                selectedUnits[ingredient.id] = ingredient.unit.ifBlank { "g" }
+                                            } else {
+                                                selectedIngredients.remove(ingredient.id)
+                                                selectedUnits.remove(ingredient.id)
+                                            }
                                         }
                                     )
 
@@ -268,13 +287,49 @@ fun RecipeScreen(
                                     if (isSelected) {
                                         OutlinedTextField(
                                             value = selectedIngredients[ingredient.id] ?: "",
-                                            onValueChange = {
-                                                selectedIngredients[ingredient.id] = it
-                                            },
+                                            onValueChange = { selectedIngredients[ingredient.id] = it },
                                             label = { Text("Qty") },
-                                            modifier = Modifier.width(80.dp),
+                                            modifier = Modifier.width(70.dp),
                                             singleLine = true
                                         )
+
+                                        Spacer(modifier = Modifier.width(4.dp))
+
+                                        ExposedDropdownMenuBox(
+                                            expanded = unitDropdownExpanded,
+                                            onExpandedChange = { unitDropdownExpanded = it },
+                                            modifier = Modifier.width(100.dp)
+                                        ) {
+                                            OutlinedTextField(
+                                                value = selectedUnits[ingredient.id] ?: ingredient.unit.ifBlank { "g" },
+                                                onValueChange = {},
+                                                readOnly = true,
+                                                label = { Text("Unit") },
+                                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(unitDropdownExpanded) },
+                                                modifier = Modifier
+                                                    .menuAnchor(
+                                                        type = ExposedDropdownMenuAnchorType.PrimaryNotEditable,
+                                                        enabled = true
+                                                    )
+                                                    .fillMaxWidth(),
+                                                singleLine = true
+                                            )
+
+                                            ExposedDropdownMenu(
+                                                expanded = unitDropdownExpanded,
+                                                onDismissRequest = { unitDropdownExpanded = false }
+                                            ) {
+                                                unitOptions.forEach { option ->
+                                                    DropdownMenuItem(
+                                                        text = { Text(option) },
+                                                        onClick = {
+                                                            selectedUnits[ingredient.id] = option
+                                                            unitDropdownExpanded = false
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -291,31 +346,15 @@ fun RecipeScreen(
 
                         coroutineScope.launch {
                             val currentDate = (System.currentTimeMillis() / 1000).toInt()
+                            val recipeId = viewModel.addRecipeAndReturnId(name.trim(), instructions.trim(), currentDate)
 
-                            val recipeId = viewModel.addRecipeAndReturnId(
-                                name.trim(),
-                                instructions.trim(),
-                                currentDate
-                            )
-
-                            // Save ingredients
                             selectedIngredients.forEach { (id, qtyString) ->
                                 val qty = qtyString.toDoubleOrNull() ?: 0.0
                                 if (qty > 0) {
-                                    var ingredient = ingredientViewModel.getIngredientById(id)
-                                    if (ingredient == null) {
-                                        ingredientViewModel.addIngredient(
-                                            name = allIngredients.find { it.id == id }?.name ?: "Unknown",
-                                            quantity = 0.0,
-                                            unit = "",
-                                            price = 0.0,
-                                            pricePerUnit = 0.0,
-                                            dateEntered = currentDate,
-                                            dateLastUpdated = currentDate
-                                        )
-                                        ingredient = ingredientViewModel.getIngredientById(id)
-                                    }
-                                    ingredient?.let { viewModel.addIngredientToRecipe(recipeId, it.id, qty) }
+                                    val ingredient = allIngredients.find { it.id == id }
+                                    val selectedUnit = selectedUnits[id] ?: ingredient?.unit ?: "g"
+                                    val gramsToStore = ingredientViewModel.convertToGrams(qty, selectedUnit, ingredient?.density)
+                                    viewModel.addIngredientToRecipe(recipeId, id, gramsToStore, selectedUnit)
                                 }
                             }
 

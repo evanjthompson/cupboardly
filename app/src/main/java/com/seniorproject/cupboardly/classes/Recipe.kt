@@ -15,17 +15,19 @@ class Recipe(context: Context) {
     // Add recipe and return the generated ID
     suspend fun addRecipe(name: String, instructions: String, dateCreated: Int): Long {
         val recipe = RecipeEntity(name = name, instructions = instructions, dateCreated = dateCreated)
-        return recipeDao.insert(recipe) // <-- returns ID as Long
+        return recipeDao.insert(recipe)
     }
 
     // Link ingredient to recipe with specified quantity
-    suspend fun addIngredientToRecipe(recipeId: Long, ingredientId: Long, quantityUsed: Double) {
-        val entry = RecipeIngredientEntity(
-            recipeId = recipeId,
-            ingredientId = ingredientId,
-            quantityUsed = quantityUsed
+    suspend fun addIngredientToRecipe(recipeId: Long, ingredientId: Long, quantityUsed: Double, unitUsed: String) {
+        recipeIngredientDao.insert(
+            RecipeIngredientEntity(
+                recipeId = recipeId,
+                ingredientId = ingredientId,
+                quantityUsed = quantityUsed,
+                unitUsed = unitUsed
+            )
         )
-        recipeIngredientDao.insert(entry)
     }
 
     suspend fun getIngredientsForRecipe(recipeId: Long): List<RecipeIngredientEntity> {

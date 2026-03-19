@@ -30,6 +30,7 @@ data class RecipeIngredientEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0L,
     val recipeId: Long,
     val ingredientId: Long,
-    val quantityUsed: Double
+    val quantityUsed: Double,
+    val unitUsed: String    // unit stored for display
 )
 

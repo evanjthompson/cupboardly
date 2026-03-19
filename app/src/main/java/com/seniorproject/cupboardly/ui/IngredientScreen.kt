@@ -24,11 +24,15 @@ import com.seniorproject.cupboardly.R
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.ui.text.font.FontWeight
-import com.seniorproject.cupboardly.ai.askGeminiForDensity
+import com.seniorproject.cupboardly.classes.askGeminiForDensity
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+fun formatQuantity(value: Double): String {
+    return if (value % 1.0 == 0.0) value.toInt().toString() else value.toString()
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -149,11 +153,89 @@ fun IngredientScreen(
                                     .padding(16.dp)
                             ) {
 
-                                if (!isEditing && !isAddingMore) {
-                                    Text("${ingredient.name} ${ingredient.quantity} ${ingredient.unit}")
-                                } else {
-                                    Text(ingredient.name)
-                                }
+                                if (!isEditing && !isAddingMore && ingredient.unit != "unit") {
+                                        val unitOptions = listOf(
+                                            "g",
+                                            "kg",
+                                            "oz",
+                                            "lb",
+                                            "ml",
+                                            "cup",
+                                            "tbsp",
+                                            "tsp",
+                                            "floz"
+                                        )
+                                        var displayUnit by remember { mutableStateOf(ingredient.unit) }
+                                        var unitDropdownExpanded by remember { mutableStateOf(false) }
+
+                                        val displayQty = remember(
+                                            ingredient.quantity,
+                                            ingredient.density,
+                                            displayUnit
+                                        ) {
+                                            viewModel.convertFromGrams(
+                                                ingredient.quantity,
+                                                displayUnit,
+                                                ingredient.density
+                                            )
+                                        }
+
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text(
+                                                text = "${ingredient.name} ${
+                                                    formatQuantity(displayQty)
+                                                }",
+                                                modifier = Modifier.weight(1f)
+                                            )
+
+                                            ExposedDropdownMenuBox(
+                                                expanded = unitDropdownExpanded,
+                                                onExpandedChange = { unitDropdownExpanded = it },
+                                                modifier = Modifier.width(110.dp)
+                                            ) {
+                                                OutlinedTextField(
+                                                    value = displayUnit,
+                                                    onValueChange = {},
+                                                    readOnly = true,
+                                                    trailingIcon = {
+                                                        ExposedDropdownMenuDefaults.TrailingIcon(
+                                                            unitDropdownExpanded
+                                                        )
+                                                    },
+                                                    modifier = Modifier
+                                                        .menuAnchor(
+                                                            type = ExposedDropdownMenuAnchorType.PrimaryNotEditable,
+                                                            enabled = true
+                                                        )
+                                                        .fillMaxWidth(),
+                                                    singleLine = true
+                                                )
+
+                                                ExposedDropdownMenu(
+                                                    expanded = unitDropdownExpanded,
+                                                    onDismissRequest = {
+                                                        unitDropdownExpanded = false
+                                                    }
+                                                ) {
+                                                    unitOptions.forEach { option ->
+                                                        DropdownMenuItem(
+                                                            text = { Text(option) },
+                                                            onClick = {
+                                                                displayUnit = option
+                                                                unitDropdownExpanded = false
+                                                            }
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        Text("${ingredient.name} ${formatQuantity(ingredient.quantity)}")
+                                    }
+
 
                                 if (expanded) {
                                     when {
@@ -222,15 +304,17 @@ fun IngredientScreen(
 
                                                         if (valid) {
                                                             val currentDate = (System.currentTimeMillis() / 1000).toInt()
-                                                            val newQuantity = ingredient.quantity + quantityValue!!
+                                                            val gramsToAdd = viewModel.convertToGrams(quantityValue!!, ingredient.unit, ingredient.density)
+                                                            val newQuantity = ingredient.quantity + gramsToAdd
                                                             val newPrice = ingredient.price + priceValue!!
-                                                            val newPricePerUnit = newPrice / newQuantity
+                                                            val displayQty = viewModel.convertFromGrams(newQuantity, ingredient.unit, ingredient.density)
+                                                            val newPricePerUnit = if (displayQty > 0) newPrice / displayQty else 0.0
 
                                                             val updatedIngredient = ingredient.copy(
                                                                 quantity = newQuantity,
                                                                 price = newPrice,
                                                                 pricePerUnit = newPricePerUnit,
-                                                                allTimeQuantity = ingredient.allTimeQuantity + quantityValue,
+                                                                allTimeQuantity = ingredient.allTimeQuantity + gramsToAdd,
                                                                 allTimePrice = ingredient.allTimePrice + priceValue,
                                                                 dateLastUpdated = currentDate
                                                             )
@@ -380,12 +464,11 @@ fun IngredientScreen(
                                         else -> {
 
                                             Spacer(modifier = Modifier.height(8.dp))
-                                            Text("Total Price: $${ingredient.price}")
-                                            Text("Price per Unit: $${"%.2f".format(ingredient.pricePerUnit)} per ${ingredient.unit}")
+                                            Text("Amount Paid for Ingredient: $${ingredient.price} ($${"%.2f".format(ingredient.pricePerUnit)} per ${ingredient.unit})")
                                             Text("Date Entered: ${sdf.format(Date(ingredient.dateEntered * 1000L))}")
                                             Text("Date Last Updated: ${sdf.format(Date(ingredient.dateLastUpdated * 1000L))}")
                                             Spacer(modifier = Modifier.height(5.dp))
-                                            Text("Total Tracked All Time: ${ingredient.allTimeQuantity}")
+                                            //Text("Total Tracked All Time: ${convertFromGrams(ingredient.allTimeQuantity, ingredient.unit, ingredient.density)} ${ingredient.unit}")
                                             Text("Total Cost All Time: $${ingredient.allTimePrice}")
 
                                             Spacer(modifier = Modifier.height(12.dp))
@@ -470,12 +553,10 @@ fun IngredientScreen(
                                 nameError = "Please enter a Name"
                                 isValid = false
                             }
-
                             if (quantityValue == null || quantityValue <= 0.0) {
                                 quantityError = "Quantity cannot be 0"
                                 isValid = false
                             }
-
                             if (priceValue == null || priceValue <= 0.0) {
                                 priceError = "Enter the new purchase price"
                                 isValid = false
@@ -483,51 +564,35 @@ fun IngredientScreen(
 
                             if (!isValid) return@Button
 
-                            val currentDate =
-                                (System.currentTimeMillis() / 1000).toInt()
+                            scope.launch {
+                                val currentDate = (System.currentTimeMillis() / 1000).toInt()
 
-                            val existingIngredient = ingredients.find {
-                                it.name.equals(trimmedName, ignoreCase = true)
-                            }
+                                val existingIngredient = ingredients.find {
+                                    it.name.equals(trimmedName, ignoreCase = true)
+                                }
 
-                            if (existingIngredient != null) {
-
-                                val newQuantity = existingIngredient.quantity + quantityValue!!
-                                val newTotalPrice = existingIngredient.price + priceValue!!
-                                val newPricePerUnit = newTotalPrice / newQuantity
-
-                                val updatedIngredient = existingIngredient.copy(
-                                    quantity = newQuantity,
-                                    price = newTotalPrice,
-                                    pricePerUnit = newPricePerUnit,
-                                    allTimeQuantity = existingIngredient.allTimeQuantity + quantityValue,
-                                    allTimePrice = existingIngredient.allTimePrice + priceValue,
-                                    dateLastUpdated = currentDate
-                                )
-
-                                viewModel.updateIngredient(updatedIngredient)
-
-                            } else {
-
-                                val pricePerUnitValue =
-                                    priceValue!! / quantityValue!!
+                                val densityValue = when {
+                                    existingIngredient != null -> existingIngredient.density
+                                    unit == "unit" -> 1.0  // density irrelevant for countable items
+                                    else -> askGeminiForDensity(trimmedName)
+                                }
 
                                 viewModel.addIngredient(
                                     name = trimmedName,
-                                    quantity = quantityValue,
+                                    quantity = quantityValue!!,
+                                    density = densityValue,
                                     unit = unit,
-                                    price = priceValue,
-                                    pricePerUnit = pricePerUnitValue,
+                                    price = priceValue!!,
                                     dateEntered = currentDate,
                                     dateLastUpdated = currentDate
                                 )
-                            }
 
-                            name = ""
-                            quantity = ""
-                            unit = ""
-                            price = ""
-                            showAddNew = false
+                                name = ""
+                                quantity = ""
+                                unit = ""
+                                price = ""
+                                showAddNew = false
+                            }
 
                         }) {
                             Text("Add")
@@ -597,33 +662,62 @@ fun IngredientScreen(
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            OutlinedTextField(
-                                value = quantity,
-                                onValueChange = { quantity = it },
-                                label = { Text("Quantity") },
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Number
-                                ),
-                                isError = quantityError != null,
+                            val unitOptions = listOf("unit", "g", "kg", "oz", "lb", "ml", "cup", "tbsp", "tsp", "floz")
+                            var unitDropdownExpanded by remember { mutableStateOf(false) }
+
+                            Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                supportingText = {
-                                    quantityError?.let {
-                                        Text(
-                                            it,
-                                            color = MaterialTheme.colorScheme.error
-                                        )
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = quantity,
+                                    onValueChange = { quantity = it },
+                                    label = { Text("Quantity") },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    isError = quantityError != null,
+                                    modifier = Modifier.weight(1f),
+                                    supportingText = {
+                                        quantityError?.let {
+                                            Text(it, color = MaterialTheme.colorScheme.error)
+                                        }
+                                    }
+                                )
+
+                                ExposedDropdownMenuBox(
+                                    expanded = unitDropdownExpanded,
+                                    onExpandedChange = { unitDropdownExpanded = it },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    OutlinedTextField(
+                                        value = unit,
+                                        onValueChange = {},
+                                        readOnly = true,
+                                        label = { Text("Unit") },
+                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(unitDropdownExpanded) },
+                                        modifier = Modifier
+                                            .menuAnchor(
+                                                type = ExposedDropdownMenuAnchorType.PrimaryNotEditable,
+                                                enabled = true
+                                            )
+                                            .fillMaxWidth()
+                                    )
+
+                                    ExposedDropdownMenu(
+                                        expanded = unitDropdownExpanded,
+                                        onDismissRequest = { unitDropdownExpanded = false }
+                                    ) {
+                                        unitOptions.forEach { option ->
+                                            DropdownMenuItem(
+                                                text = { Text(option) },
+                                                onClick = {
+                                                    unit = option
+                                                    unitDropdownExpanded = false
+                                                }
+                                            )
+                                        }
                                     }
                                 }
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            OutlinedTextField(
-                                value = unit,
-                                onValueChange = { unit = it },
-                                label = { Text("Unit of Measurement") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                            }
 
                             Spacer(modifier = Modifier.height(8.dp))
 

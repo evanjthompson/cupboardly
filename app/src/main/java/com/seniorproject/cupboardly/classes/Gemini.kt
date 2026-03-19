@@ -1,4 +1,4 @@
-package com.seniorproject.cupboardly.ai
+package com.seniorproject.cupboardly.classes
 
 import android.util.Log
 import com.google.firebase.Firebase
@@ -29,18 +29,21 @@ object GeminiService {
     }
 }
 
-suspend fun askGeminiForDensity(ingredient: String): Float? {
+suspend fun askGeminiForDensity(ingredient: String): Double {
 
     val prompt = """
         Return ONLY a single floating point number.
         Do not include units or extra text.
 
-        What is the average density of $ingredient in grams per cup?
+        What is the average density of $ingredient in grams per milliliter?
     """.trimIndent()
 
     val response = GeminiService.askGemini(prompt)
 
     Log.d("Gemini", "Parsed density: $response")
 
-    return response?.toFloatOrNull()
+    return response?.toDoubleOrNull() ?: run {
+        Log.w("Gemini", "Failed to parse density for '$ingredient', using fallback of 1.0")
+        1.0
+    }
 }
