@@ -648,4 +648,4 @@ fun IngredientScreen(
         }
     }
 }
-}
+
