@@ -13,6 +13,7 @@ ksp = "2.3.5"
 lifecycle = "2.6.2"
 compiler = "3.2.0-alpha11"
 ui = "1.10.2"
+googleServices = "4.4.2"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -40,3 +41,4 @@ androidx-ui = { group = "androidx.compose.ui", name = "ui", version.ref = "ui" }
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 google-devtools-ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+google-gms-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }

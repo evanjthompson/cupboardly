@@ -54,6 +54,13 @@ class IngredientViewModel(application: Application) : AndroidViewModel(applicati
         return ingredientWrapper.getIngredientById(id)
     }
 
+    fun updateIngredient(updatedIngredient: IngredientEntity) {
+        viewModelScope.launch {
+            ingredientWrapper.updateIngredient(updatedIngredient)
+            _ingredients.value = ingredientWrapper.getAll()
+        }
+    }
+
     fun deleteIngredient(ingredient: IngredientEntity) {
         viewModelScope.launch {
             ingredientWrapper.delete(ingredient)
