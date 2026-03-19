@@ -35,13 +35,13 @@ class IngredientViewModel(application: Application) : AndroidViewModel(applicati
         name: String,
         quantity: Double,
         unit: String,
+        density: Double,
         price: Double,
-        pricePerUnit: Double,
         dateEntered: Int,
         dateLastUpdated: Int
     ) {
         viewModelScope.launch {
-            ingredientWrapper.addIngredient(name, quantity, unit, price, pricePerUnit, dateEntered, dateLastUpdated)
+            ingredientWrapper.addIngredient(name, quantity, unit, density, price, dateEntered, dateLastUpdated)
             _ingredients.value = ingredientWrapper.getAll()
         }
     }
@@ -67,5 +67,15 @@ class IngredientViewModel(application: Application) : AndroidViewModel(applicati
             _ingredients.value = ingredientWrapper.getAll()
         }
     }
+
+    // function to convert from grams to unit
+    fun convertFromGrams(grams: Double, unit: String, density: Double?): Double {
+        return com.seniorproject.cupboardly.classes.convertFromGrams(grams, unit, density)
+    }
+
+    fun convertToGrams(amount: Double, unit: String, density: Double?): Double {
+        return com.seniorproject.cupboardly.classes.convertToGrams(amount, unit, density)
+    }
+
 }
 

@@ -13,7 +13,7 @@ import com.seniorproject.cupboardly.room.entity.RecipeIngredientEntity
 
 @Database(
     entities = [IngredientEntity::class, RecipeEntity::class, RecipeIngredientEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -27,10 +27,11 @@ abstract class AppDatabase : RoomDatabase() {
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
-                                context.applicationContext,
-                                AppDatabase::class.java,
-                                "cupboardly_database"
-                            ).fallbackToDestructiveMigration(false)
+                    context.applicationContext,
+                    AppDatabase::class.java,
+                    "cupboardly_database"
+                )
+                    .fallbackToDestructiveMigration(true)
                     .build()
                 INSTANCE = instance
                 instance
