@@ -63,7 +63,8 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:34.9.0"))
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-ai")
-    implementation("com.google.guava:guava:31.1-android") {
+    implementation("com.google.guava:guava:31.1-android")
+    {
         exclude(group = "com.google.guava", module = "listenablefuture")
     }
 }

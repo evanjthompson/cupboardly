@@ -9,54 +9,48 @@ class Ingredient(context: Context) {
     private val db = AppDatabase.getDatabase(context)
     private val ingredientDao = db.ingredientDao()
 
-    /**
-     * Add an ingredient to inventory.
-     * If ingredient with same name exists, increment quantity and update price info.
-     */
     suspend fun addIngredient(
         name: String,
         quantity: Double,
         unit: String,
+        density: Double,
         price: Double,
-        pricePerUnit: Double,
         dateEntered: Int,
         dateLastUpdated: Int
     ) {
+        val gramsToStore = convertToGrams(quantity, unit, density)
+
         val existing = ingredientDao.getIngredientByName(name)
 
         if (existing != null) {
-
-            val newQuantity = existing.quantity + quantity
-            val newPrice = existing.price + price
-
-            val newAllTimeQuantity = existing.allTimeQuantity + quantity
+            val newAllTimeQuantity = existing.allTimeQuantity + gramsToStore
             val newAllTimePrice = existing.allTimePrice + price
+            val newQuantity = existing.quantity + gramsToStore
+            val newPrice = existing.price + price
+            val displayQty = convertFromGrams(newQuantity, existing.unit, existing.density)
 
             val updatedIngredient = existing.copy(
                 quantity = newQuantity,
                 price = newPrice,
                 allTimeQuantity = newAllTimeQuantity,
                 allTimePrice = newAllTimePrice,
-                pricePerUnit = newPrice / newQuantity,
+                pricePerUnit = if (displayQty > 0) newPrice / displayQty else 0.0,
                 dateLastUpdated = dateLastUpdated
             )
-
             ingredientDao.update(updatedIngredient)
-
         } else {
-
             val ingredient = IngredientEntity(
                 name = name,
-                quantity = quantity,
+                quantity = gramsToStore,
                 unit = unit,
+                density = density,
                 price = price,
-                pricePerUnit = pricePerUnit,
-                allTimeQuantity = quantity,
+                pricePerUnit = if (quantity > 0) price / quantity else 0.0,
+                allTimeQuantity = gramsToStore,
                 allTimePrice = price,
                 dateEntered = dateEntered,
                 dateLastUpdated = dateLastUpdated
             )
-
             ingredientDao.insert(ingredient)
         }
     }
@@ -66,7 +60,6 @@ class Ingredient(context: Context) {
     }
 
     suspend fun updateIngredient(updatedIngredient: IngredientEntity) {
-
         val existing = ingredientDao.getIngredientById(updatedIngredient.id)
             ?: return
 
@@ -79,13 +72,19 @@ class Ingredient(context: Context) {
         val finalIngredient = updatedIngredient.copy(
             allTimeQuantity = newAllTimeQuantity,
             allTimePrice = newAllTimePrice,
-            pricePerUnit = if (updatedIngredient.quantity > 0)
-                updatedIngredient.price / updatedIngredient.quantity
-            else 0.0
+            pricePerUnit = if (updatedIngredient.quantity > 0) {
+                val displayQty = convertFromGrams(
+                    updatedIngredient.quantity,
+                    updatedIngredient.unit,
+                    updatedIngredient.density
+                )
+                if (displayQty > 0) updatedIngredient.price / displayQty else 0.0
+            } else 0.0
         )
 
         ingredientDao.update(finalIngredient)
     }
+
     suspend fun getIngredientById(id: Long): IngredientEntity? {
         return ingredientDao.getAllIngredients().find { it.id == id }
     }

@@ -42,8 +42,8 @@ class RecipeViewModel(application: Application) : AndroidViewModel(application) 
         return recipeWrapper.getIngredientsForRecipe(recipeId)
     }
 
-    suspend fun addIngredientToRecipe(recipeId: Long, ingredientId: Long, quantityUsed: Double) {
-        recipeWrapper.addIngredientToRecipe(recipeId, ingredientId, quantityUsed)
+    suspend fun addIngredientToRecipe(recipeId: Long, ingredientId: Long, quantityUsed: Double, unitUsed: String) {
+        recipeWrapper.addIngredientToRecipe(recipeId, ingredientId, quantityUsed, unitUsed)
     }
 
     suspend fun addRecipeAndReturnId(name: String, instructions: String, dateCreated: Int): Long {
