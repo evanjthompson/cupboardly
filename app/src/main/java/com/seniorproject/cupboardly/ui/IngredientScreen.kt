@@ -160,6 +160,7 @@ fun IngredientScreen(
                                             "oz",
                                             "lb",
                                             "ml",
+                                            "gal",
                                             "cup",
                                             "tbsp",
                                             "tsp",
@@ -662,7 +663,7 @@ fun IngredientScreen(
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            val unitOptions = listOf("unit", "g", "kg", "oz", "lb", "ml", "cup", "tbsp", "tsp", "floz")
+                            val unitOptions = listOf("unit", "g", "kg", "oz", "lb", "ml", "gal", "cup", "tbsp", "tsp", "floz")
                             var unitDropdownExpanded by remember { mutableStateOf(false) }
 
                             Row(
