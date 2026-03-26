@@ -7,13 +7,17 @@ import com.seniorproject.cupboardly.room.entity.RecipeEntity
 interface RecipeDao {
 
     @Insert
-    suspend fun insert(recipe: RecipeEntity): Long // returns the rowId of the inserted recipe
+    suspend fun insert(recipe: RecipeEntity): Long
 
     @Update
     suspend fun update(recipe: RecipeEntity)
 
     @Delete
     suspend fun delete(recipe: RecipeEntity)
+
+    // ✅ NEW (required for your delete flow)
+    @Query("DELETE FROM recipe_table WHERE id = :recipeId")
+    suspend fun deleteById(recipeId: Long)
 
     @Query("SELECT * FROM recipe_table ORDER BY name ASC")
     suspend fun getAllRecipes(): List<RecipeEntity>
