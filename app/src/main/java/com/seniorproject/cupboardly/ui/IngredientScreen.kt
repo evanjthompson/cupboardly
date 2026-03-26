@@ -23,7 +23,11 @@ import androidx.compose.ui.unit.sp
 import com.seniorproject.cupboardly.R
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
+import androidx.room.util.copy
 import com.seniorproject.cupboardly.classes.askGeminiForDensity
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -34,8 +38,34 @@ fun formatQuantity(value: Double): String {
     return if (value % 1.0 == 0.0) value.toInt().toString() else value.toString()
 }
 
+// Function to autosize text in buttons so no wrapping occurs
+@Composable
+fun AutoSizeText(
+    text: String,
+    modifier: Modifier = Modifier,
+    minFontSize: TextUnit = 8.sp,
+    maxFontSize: TextUnit = 16.sp,
+    style: TextStyle = LocalTextStyle.current
+) {
+    var fontSize by remember { mutableStateOf(maxFontSize) }
+
+    Text(
+        text = text,
+        modifier = modifier,
+        style = style.copy(fontSize = fontSize),
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Clip,
+        onTextLayout = { result ->
+            if (result.hasVisualOverflow && fontSize > minFontSize) {
+                fontSize = (fontSize.value * 0.9f).sp
+            }
+        }
+    )
+}
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+
 fun IngredientScreen(
     viewModel: IngredientViewModel = viewModel(),
     onGoToRecipes: () -> Unit
@@ -458,7 +488,12 @@ fun IngredientScreen(
                                                     },
                                                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                                                     modifier = Modifier.weight(0.75f)
-                                                ) { Text("Delete") }
+                                                ) { AutoSizeText(
+                                                    text = "Delete",
+                                                    maxFontSize = 16.sp,
+                                                    minFontSize = 8.sp,
+                                                    modifier = Modifier.fillMaxWidth()
+                                                )}
                                             }
                                         }
 

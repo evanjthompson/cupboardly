@@ -100,7 +100,12 @@ fun RecipeScreen(
                 Button(
                     onClick = onGoToIngredients,
                     modifier = Modifier.weight(1f)
-                ) { Text("Ingredients") }
+                ) { AutoSizeText(
+                    text = "Ingredients",
+                    maxFontSize = 20.sp,
+                    minFontSize = 12.sp,
+                    modifier = Modifier.fillMaxWidth()
+                ) }
 
                 Button(
                     onClick = {},
