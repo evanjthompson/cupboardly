@@ -29,24 +29,49 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import com.seniorproject.cupboardly.classes.askGeminiForDensity
-
+import android.net.Uri
+import android.os.Environment
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
+import java.io.File
+import android.util.Log
+import androidx.core.content.ContextCompat
+import android.content.pm.PackageManager
 @OptIn(ExperimentalMaterial3Api::class)
+
 @Composable
 fun RecipeScreen(
     viewModel: RecipeViewModel = viewModel(),
     ingredientViewModel: IngredientViewModel = viewModel(),
     onGoToIngredients: () -> Unit
 ) {
+    var hasCameraPermission by remember { mutableStateOf(false) }
 
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        hasCameraPermission = granted
+    }
     val recipes by viewModel.recipes.collectAsState()
     val allIngredients by ingredientViewModel.ingredients.collectAsState(initial = emptyList())
     val coroutineScope = rememberCoroutineScope()
-
     val sdf = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
     val recipeIngredientsMap = remember { mutableStateMapOf<Long, String>() }
+    val context = LocalContext.current
 
+    var photoUri by remember { mutableStateOf<Uri?>(null) }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            Log.d("Camera", "Photo saved: $photoUri")
+        }
+    }
     var showAddDialog by remember { mutableStateOf(false) }
-
+    var showMenu by remember { mutableStateOf(false) }
     // NEW
     var showStartDialog by remember { mutableStateOf(false) }
     var activeRecipe by remember { mutableStateOf<Long?>(null) }
@@ -73,7 +98,17 @@ fun RecipeScreen(
             }
         }
     }
-
+    LaunchedEffect(Unit) {
+        if (ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.CAMERA
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            hasCameraPermission = true
+        } else {
+            permissionLauncher.launch(android.Manifest.permission.CAMERA)
+        }
+    }
     val gold = Color(197, 145, 39)
     val darkBlue = Color(11, 186, 224)
 
@@ -158,14 +193,66 @@ fun RecipeScreen(
             }
         }
 
-        Button(
-            onClick = { showAddDialog = true },
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(35.dp)
-                .size(64.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = gold)
-        ) { Text("+", fontSize = 32.sp) }
+        ) {
+
+            Button(
+                onClick = { showMenu = true },
+                modifier = Modifier.size(64.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = gold)
+            ) {
+                Text("+", fontSize = 32.sp)
+            }
+
+            DropdownMenu(
+                expanded = showMenu,
+                onDismissRequest = { showMenu = false }
+            ) {
+
+                // ➕ Add Recipe
+                DropdownMenuItem(
+                    text = { Text("Add Recipe") },
+                    onClick = {
+                        showMenu = false
+                        showAddDialog = true
+                    }
+                )
+
+                // 📷 Take Photo
+                DropdownMenuItem(
+                    text = { Text("Take Photo") },
+                    onClick = {
+                        if (hasCameraPermission) {
+                            // 1️⃣ Create a file for the photo
+                            val timestamp =
+                                SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+                            val photoFile = File(
+                                context.getExternalFilesDir(Environment.DIRECTORY_PICTURES),
+                                "JPEG_${timestamp}_.jpg"
+                            )
+
+                            // 2️⃣ Get a content URI using FileProvider
+                            val uri = FileProvider.getUriForFile(
+                                context,
+                                "${context.packageName}.fileprovider", // MUST match manifest
+                                photoFile
+                            )
+
+                            photoUri = uri
+
+                            // 3️⃣ Launch the camera safely
+                            cameraLauncher.launch(uri)
+                        } else {
+                            // Request permission if not yet granted
+                            permissionLauncher.launch(android.Manifest.permission.CAMERA)
+                        }
+                    }
+                )
+            }
+        }
 
         // ---------------- ADD RECIPE DIALOG ----------------
 
@@ -387,6 +474,7 @@ fun RecipeScreen(
                         }
                     }) { Text("Save") }
                 },
+
 
                 dismissButton = {
                     Button(onClick = { showAddDialog = false }) {
