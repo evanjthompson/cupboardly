@@ -184,6 +184,7 @@ fun RecipeScreen(
         ) { Text("+", fontSize = 32.sp) }
 
 
+        // START RECIPE DIALOG
         if (showStartDialog && activeRecipe != null) {
 
             val recipe = recipes.find { it.id == activeRecipe }
@@ -201,6 +202,30 @@ fun RecipeScreen(
 
                         Spacer(modifier = Modifier.height(12.dp))
 
+                        // DISPLAY AMOUNTS TO USE AND REMAINING
+                        val links = viewModel.getIngredientsForRecipe(activeRecipe!!)
+                        val ingredientInfo = links.mapNotNull { link ->
+                            val ingredient = ingredientViewModel.getIngredientById(link.ingredientId)
+                            ingredient?.let {
+                                val usedDisplay = ingredientViewModel.convertFromGrams(
+                                    link.quantityUsed, link.unitUsed, it.density
+                                )
+                                val afterDisplay = ingredientViewModel.convertFromGrams(
+                                    it.quantity - link.quantityUsed, link.unitUsed, it.density
+                                )
+                                "${it.name}: Use ${"%.2f".format(usedDisplay)} ${link.unitUsed}, " +
+                                        "Remaining ${"%.2f".format(afterDisplay)} ${link.unitUsed}"
+                            }
+                        }
+
+                        Text("Ingredients to be used:", fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        ingredientInfo.forEach { info ->
+                            Text(info)
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
                         startError?.let {
                             Text(it, color = Color.Red)
                         }
@@ -212,30 +237,20 @@ fun RecipeScreen(
 
                         Button(onClick = {
                             coroutineScope.launch {
-
-                                val links =
-                                    viewModel.getIngredientsForRecipe(activeRecipe!!)
+                                val links = viewModel.getIngredientsForRecipe(activeRecipe!!)
 
                                 val insufficient = mutableListOf<String>()
 
                                 links.forEach { link ->
-                                    val ingredient =
-                                        ingredientViewModel.getIngredientById(link.ingredientId)
+                                    val ingredient = ingredientViewModel.getIngredientById(link.ingredientId)
 
                                     if (ingredient != null && ingredient.quantity < link.quantityUsed) {
-
                                         val neededDisplay = ingredientViewModel.convertFromGrams(
-                                            link.quantityUsed,
-                                            link.unitUsed,
-                                            ingredient.density
+                                            link.quantityUsed, link.unitUsed, ingredient.density
                                         )
-
                                         val haveDisplay = ingredientViewModel.convertFromGrams(
-                                            ingredient.quantity,
-                                            link.unitUsed,
-                                            ingredient.density
+                                            ingredient.quantity, link.unitUsed, ingredient.density
                                         )
-
                                         insufficient.add(
                                             "${ingredient.name} (need ${"%.2f".format(neededDisplay)} ${link.unitUsed}, " +
                                                     "have ${"%.2f".format(haveDisplay)} ${link.unitUsed})"
@@ -244,20 +259,16 @@ fun RecipeScreen(
                                 }
 
                                 if (insufficient.isNotEmpty()) {
-                                    startError =
-                                        "Not enough: ${insufficient.joinToString(", ")}"
+                                    startError = "Not enough: ${insufficient.joinToString(", ")}"
                                     return@launch
                                 }
 
                                 links.forEach { link ->
-                                    val ingredient =
-                                        ingredientViewModel.getIngredientById(link.ingredientId)
-
+                                    val ingredient = ingredientViewModel.getIngredientById(link.ingredientId)
                                     ingredient?.let {
                                         val updated = it.copy(
                                             quantity = it.quantity - link.quantityUsed,
-                                            dateLastUpdated =
-                                                (System.currentTimeMillis() / 1000).toInt()
+                                            dateLastUpdated = (System.currentTimeMillis() / 1000).toInt()
                                         )
                                         ingredientViewModel.updateIngredient(updated)
                                     }
@@ -269,14 +280,11 @@ fun RecipeScreen(
                             Text("Confirm & Start")
                         }
 
-                        // NEW MAKE ANYWAY BUTTON
                         if (!startError.isNullOrBlank()) {
                             Spacer(modifier = Modifier.height(8.dp))
 
                             Button(
-                                onClick = {
-                                    showOverrideConfirmDialog = true
-                                },
+                                onClick = { showOverrideConfirmDialog = true },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
                             ) {
                                 Text("Make Anyway")
@@ -316,15 +324,13 @@ fun RecipeScreen(
                             val links = viewModel.getIngredientsForRecipe(activeRecipe!!)
 
                             links.forEach { link ->
-                                val ingredient =
-                                    ingredientViewModel.getIngredientById(link.ingredientId)
+                                val ingredient = ingredientViewModel.getIngredientById(link.ingredientId)
 
                                 ingredient?.let {
                                     if (it.quantity >= link.quantityUsed) {
                                         val updated = it.copy(
                                             quantity = it.quantity - link.quantityUsed,
-                                            dateLastUpdated =
-                                                (System.currentTimeMillis() / 1000).toInt()
+                                            dateLastUpdated = (System.currentTimeMillis() / 1000).toInt()
                                         )
                                         ingredientViewModel.updateIngredient(updated)
                                     }
