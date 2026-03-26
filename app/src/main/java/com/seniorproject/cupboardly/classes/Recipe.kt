@@ -50,3 +50,25 @@ class Recipe(context: Context) {
         recipeDao.delete(recipe)
     }
 }
+    suspend fun getIngredientsForRecipe(recipeId: Long): List<RecipeIngredientEntity> {
+        return recipeIngredientDao.getIngredientsForRecipe(recipeId)
+    }
+
+    // ✅ ADD THIS
+    suspend fun deleteIngredientsForRecipe(recipeId: Long) {
+        recipeIngredientDao.deleteByRecipeId(recipeId)
+    }
+
+    // ✅ ADD THIS
+    suspend fun deleteById(recipeId: Long) {
+        recipeDao.deleteById(recipeId)
+    }
+
+    suspend fun getAll(): List<RecipeEntity> {
+        return recipeDao.getAllRecipes()
+    }
+
+    suspend fun delete(recipe: RecipeEntity) {
+        recipeDao.delete(recipe)
+    }
+}
