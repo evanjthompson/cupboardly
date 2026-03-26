@@ -15,6 +15,10 @@ interface RecipeIngredientDao {
     @Delete
     suspend fun delete(recipeIngredient: RecipeIngredientEntity)
 
+    // ✅ NEW (REQUIRED)
+    @Query("DELETE FROM recipe_ingredient_table WHERE recipeId = :recipeId")
+    suspend fun deleteByRecipeId(recipeId: Long)
+
     @Query("SELECT * FROM recipe_ingredient_table WHERE recipeId = :recipeId")
     suspend fun getIngredientsForRecipe(recipeId: Long): List<RecipeIngredientEntity>
 
