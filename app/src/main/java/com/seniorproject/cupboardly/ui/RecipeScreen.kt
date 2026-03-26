@@ -67,6 +67,11 @@ fun RecipeScreen(
             Log.d("Camera", "Photo saved: $photoUri")
         }
     }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasCameraPermission = isGranted
+    }
     var showAddDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     // NEW
@@ -145,7 +150,12 @@ fun RecipeScreen(
                         contentColor = Color.White
                     )
                 ) {
-                    Text("Ingredients")
+                    AutoSizeText(
+                        text = "Ingredients",
+                        maxFontSize = 16.sp,
+                        minFontSize = 8.sp,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
 
                 Button(
@@ -226,7 +236,7 @@ fun RecipeScreen(
             Button(
                 onClick = { showMenu = true },
                 modifier = Modifier.size(64.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = gold)
+                colors = ButtonDefaults.buttonColors(containerColor = darkBlue)
             ) {
                 Text("+", fontSize = 32.sp)
             }
