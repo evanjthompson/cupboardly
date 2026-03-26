@@ -23,19 +23,51 @@ import androidx.compose.ui.unit.sp
 import com.seniorproject.cupboardly.R
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
+import androidx.room.util.copy
 import com.seniorproject.cupboardly.classes.askGeminiForDensity
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-fun formatQuantity(value: Double): String {
-    return if (value % 1.0 == 0.0) value.toInt().toString() else value.toString()
+// function to format our numbers to reduce decmial places
+fun formatDouble(value: Double): String {
+    val rounded = Math.round(value * 100) / 100.0
+    return if (rounded % 1.0 == 0.0) rounded.toInt().toString() else rounded.toString()
 }
 
+// Function to autosize text in buttons so no wrapping occurs
+@Composable
+fun AutoSizeText(
+    text: String,
+    modifier: Modifier = Modifier,
+    minFontSize: TextUnit = 8.sp,
+    maxFontSize: TextUnit = 16.sp,
+    style: TextStyle = LocalTextStyle.current
+) {
+    var fontSize by remember { mutableStateOf(maxFontSize) }
+
+    Text(
+        text = text,
+        modifier = modifier,
+        style = style.copy(fontSize = fontSize),
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Clip,
+        onTextLayout = { result ->
+            if (result.hasVisualOverflow && fontSize > minFontSize) {
+                fontSize = (fontSize.value * 0.9f).sp
+            }
+        }
+    )
+}
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+
 fun IngredientScreen(
     viewModel: IngredientViewModel = viewModel(),
     onGoToRecipes: () -> Unit
@@ -62,7 +94,9 @@ fun IngredientScreen(
     var quantityError by remember { mutableStateOf<String?>(null) }
     var priceError by remember { mutableStateOf<String?>(null) }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .safeDrawingPadding()) {
 
         Box(modifier = Modifier.fillMaxSize()) {
             Image(
@@ -97,7 +131,7 @@ fun IngredientScreen(
                         onClick = onGoToRecipes,
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.DarkGray,
+                            containerColor = darkBlue,
                             contentColor = Color.White
                         )
                     ) {
@@ -170,7 +204,7 @@ fun IngredientScreen(
                                         var unitDropdownExpanded by remember { mutableStateOf(false) }
 
                                         val displayQty = remember(
-                                            ingredient.quantity,
+                                            formatDouble(ingredient.quantity),
                                             ingredient.density,
                                             displayUnit
                                         ) {
@@ -187,7 +221,7 @@ fun IngredientScreen(
                                         ) {
                                             Text(
                                                 text = "${ingredient.name} ${
-                                                    formatQuantity(displayQty)
+                                                    formatDouble(displayQty)
                                                 }",
                                                 modifier = Modifier.weight(1f)
                                             )
@@ -234,7 +268,7 @@ fun IngredientScreen(
                                             }
                                         }
                                     } else {
-                                        Text("${ingredient.name} ${formatQuantity(ingredient.quantity)}")
+                                        Text("${ingredient.name} ${formatDouble(ingredient.quantity)}")
                                     }
 
 
@@ -458,7 +492,12 @@ fun IngredientScreen(
                                                     },
                                                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                                                     modifier = Modifier.weight(0.75f)
-                                                ) { Text("Delete") }
+                                                ) { AutoSizeText(
+                                                    text = "Delete",
+                                                    maxFontSize = 16.sp,
+                                                    minFontSize = 8.sp,
+                                                    modifier = Modifier.fillMaxWidth()
+                                                )}
                                             }
                                         }
 
@@ -519,11 +558,17 @@ fun IngredientScreen(
                     .padding(35.dp)
                     .size(64.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = darkBlue,
+                    containerColor = gold,
                     contentColor = Color.White
-                )
+                ),
+                contentPadding = PaddingValues(0.dp) // Remove default padding
             ) {
-                Text("+", fontSize = 32.sp)
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Text("+", fontSize = 32.sp)
+                }
             }
 
             if (showAddNew) {
