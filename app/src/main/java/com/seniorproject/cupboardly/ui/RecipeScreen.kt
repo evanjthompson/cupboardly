@@ -7,8 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,7 +26,6 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import com.seniorproject.cupboardly.classes.askGeminiForDensity
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,22 +36,21 @@ fun RecipeScreen(
 ) {
 
     val recipes by viewModel.recipes.collectAsState()
-    val allIngredients by ingredientViewModel.ingredients.collectAsState(initial = emptyList())
     val coroutineScope = rememberCoroutineScope()
 
     val sdf = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
     val recipeIngredientsMap = remember { mutableStateMapOf<Long, String>() }
 
-    var showAddDialog by remember { mutableStateOf(false) }
-
     var showStartDialog by remember { mutableStateOf(false) }
     var activeRecipe by remember { mutableStateOf<Long?>(null) }
     var startError by remember { mutableStateOf<String?>(null) }
 
-    // NEW STATES
     var showOverrideConfirmDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var recipeToDelete by remember { mutableStateOf<Long?>(null) }
+
+    // ✅ FIX: state to hold ingredient info for the start dialog
+    var startDialogIngredientInfo by remember { mutableStateOf<List<String>>(emptyList()) }
 
     LaunchedEffect(recipes) {
         recipes.forEach { recipe ->
@@ -150,6 +146,7 @@ fun RecipeScreen(
                                 Button(onClick = {
                                     activeRecipe = recipe.id
                                     startError = null
+                                    startDialogIngredientInfo = emptyList()
                                     showStartDialog = true
                                 }) {
                                     Text("Start")
@@ -157,7 +154,6 @@ fun RecipeScreen(
 
                                 Spacer(modifier = Modifier.height(8.dp))
 
-                                // NEW DELETE BUTTON
                                 Button(
                                     onClick = {
                                         recipeToDelete = recipe.id
@@ -175,7 +171,7 @@ fun RecipeScreen(
         }
 
         Button(
-            onClick = { showAddDialog = true },
+            onClick = { },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(35.dp)
@@ -188,6 +184,24 @@ fun RecipeScreen(
         if (showStartDialog && activeRecipe != null) {
 
             val recipe = recipes.find { it.id == activeRecipe }
+
+            // ✅ FIX: load ingredient info in a coroutine, not directly in composable
+            LaunchedEffect(activeRecipe) {
+                val links = viewModel.getIngredientsForRecipe(activeRecipe!!)
+                startDialogIngredientInfo = links.mapNotNull { link ->
+                    val ingredient = ingredientViewModel.getIngredientById(link.ingredientId)
+                    ingredient?.let {
+                        val usedDisplay = ingredientViewModel.convertFromGrams(
+                            link.quantityUsed, link.unitUsed, it.density
+                        )
+                        val afterDisplay = ingredientViewModel.convertFromGrams(
+                            it.quantity - link.quantityUsed, link.unitUsed, it.density
+                        )
+                        "${it.name}: Use ${"%.2f".format(usedDisplay)} ${link.unitUsed}, " +
+                                "Remaining ${"%.2f".format(afterDisplay)} ${link.unitUsed}"
+                    }
+                }
+            }
 
             AlertDialog(
                 onDismissRequest = { showStartDialog = false },
@@ -202,26 +216,16 @@ fun RecipeScreen(
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // DISPLAY AMOUNTS TO USE AND REMAINING
-                        val links = viewModel.getIngredientsForRecipe(activeRecipe!!)
-                        val ingredientInfo = links.mapNotNull { link ->
-                            val ingredient = ingredientViewModel.getIngredientById(link.ingredientId)
-                            ingredient?.let {
-                                val usedDisplay = ingredientViewModel.convertFromGrams(
-                                    link.quantityUsed, link.unitUsed, it.density
-                                )
-                                val afterDisplay = ingredientViewModel.convertFromGrams(
-                                    it.quantity - link.quantityUsed, link.unitUsed, it.density
-                                )
-                                "${it.name}: Use ${"%.2f".format(usedDisplay)} ${link.unitUsed}, " +
-                                        "Remaining ${"%.2f".format(afterDisplay)} ${link.unitUsed}"
-                            }
-                        }
-
                         Text("Ingredients to be used:", fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(4.dp))
-                        ingredientInfo.forEach { info ->
-                            Text(info)
+
+                        // ✅ FIX: use state list instead of direct suspend calls
+                        if (startDialogIngredientInfo.isEmpty()) {
+                            Text("Loading...")
+                        } else {
+                            startDialogIngredientInfo.forEach { info ->
+                                Text(info)
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(12.dp))
@@ -242,7 +246,8 @@ fun RecipeScreen(
                                 val insufficient = mutableListOf<String>()
 
                                 links.forEach { link ->
-                                    val ingredient = ingredientViewModel.getIngredientById(link.ingredientId)
+                                    val ingredient =
+                                        ingredientViewModel.getIngredientById(link.ingredientId)
 
                                     if (ingredient != null && ingredient.quantity < link.quantityUsed) {
                                         val neededDisplay = ingredientViewModel.convertFromGrams(
@@ -264,7 +269,8 @@ fun RecipeScreen(
                                 }
 
                                 links.forEach { link ->
-                                    val ingredient = ingredientViewModel.getIngredientById(link.ingredientId)
+                                    val ingredient =
+                                        ingredientViewModel.getIngredientById(link.ingredientId)
                                     ingredient?.let {
                                         val updated = it.copy(
                                             quantity = it.quantity - link.quantityUsed,
@@ -324,7 +330,8 @@ fun RecipeScreen(
                             val links = viewModel.getIngredientsForRecipe(activeRecipe!!)
 
                             links.forEach { link ->
-                                val ingredient = ingredientViewModel.getIngredientById(link.ingredientId)
+                                val ingredient =
+                                    ingredientViewModel.getIngredientById(link.ingredientId)
 
                                 ingredient?.let {
                                     if (it.quantity >= link.quantityUsed) {
@@ -375,8 +382,6 @@ fun RecipeScreen(
                         onClick = {
                             coroutineScope.launch {
                                 viewModel.deleteRecipeWithIngredients(recipeToDelete!!)
-                                viewModel.refresh()
-
                                 showDeleteDialog = false
                                 recipeToDelete = null
                             }
