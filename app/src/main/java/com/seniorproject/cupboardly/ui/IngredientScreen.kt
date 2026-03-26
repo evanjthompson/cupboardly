@@ -92,7 +92,9 @@ fun IngredientScreen(
     var quantityError by remember { mutableStateOf<String?>(null) }
     var priceError by remember { mutableStateOf<String?>(null) }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .safeDrawingPadding()) {
 
         Box(modifier = Modifier.fillMaxSize()) {
             Image(
@@ -127,7 +129,7 @@ fun IngredientScreen(
                         onClick = onGoToRecipes,
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.DarkGray,
+                            containerColor = darkBlue,
                             contentColor = Color.White
                         )
                     ) {
@@ -554,7 +556,7 @@ fun IngredientScreen(
                     .padding(35.dp)
                     .size(64.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = darkBlue,
+                    containerColor = gold,
                     contentColor = Color.White
                 )
             ) {

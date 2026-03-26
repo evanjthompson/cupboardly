@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -77,7 +78,9 @@ fun RecipeScreen(
     val gold = Color(197, 145, 39)
     val darkBlue = Color(11, 186, 224)
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .safeDrawingPadding()) {
 
         Image(
             painter = painterResource(id = R.drawable.striperecipebg),
@@ -99,7 +102,11 @@ fun RecipeScreen(
 
                 Button(
                     onClick = onGoToIngredients,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = gold,
+                        contentColor = Color.White
+                    )
                 ) { AutoSizeText(
                     text = "Ingredients",
                     maxFontSize = 20.sp,
@@ -169,7 +176,7 @@ fun RecipeScreen(
                 .align(Alignment.BottomEnd)
                 .padding(35.dp)
                 .size(64.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = gold)
+            colors = ButtonDefaults.buttonColors(containerColor = darkBlue)
         ) { Text("+", fontSize = 32.sp) }
 
         // ---------------- ADD RECIPE DIALOG ----------------
