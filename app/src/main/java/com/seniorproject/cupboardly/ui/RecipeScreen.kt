@@ -202,7 +202,12 @@ fun RecipeScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Text("+", fontSize = 32.sp, color = Color.White)
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Text("+", fontSize = 32.sp)
+                }
             }
         }
 
