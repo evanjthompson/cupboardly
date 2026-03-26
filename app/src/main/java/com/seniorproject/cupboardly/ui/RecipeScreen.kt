@@ -176,8 +176,16 @@ fun RecipeScreen(
                 .align(Alignment.BottomEnd)
                 .padding(35.dp)
                 .size(64.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = darkBlue)
-        ) { Text("+", fontSize = 32.sp) }
+            colors = ButtonDefaults.buttonColors(containerColor = darkBlue),
+            contentPadding = PaddingValues(0.dp) // remove default padding
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("+", fontSize = 32.sp, color = Color.White)
+            }
+        }
 
         // ---------------- ADD RECIPE DIALOG ----------------
 

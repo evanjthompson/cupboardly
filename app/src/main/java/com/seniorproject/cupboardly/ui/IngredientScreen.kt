@@ -560,9 +560,15 @@ fun IngredientScreen(
                 colors = ButtonDefaults.buttonColors(
                     containerColor = gold,
                     contentColor = Color.White
-                )
+                ),
+                contentPadding = PaddingValues(0.dp) // Remove default padding
             ) {
-                Text("+", fontSize = 32.sp)
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Text("+", fontSize = 32.sp)
+                }
             }
 
             if (showAddNew) {
