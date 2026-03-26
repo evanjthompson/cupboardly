@@ -30,12 +30,12 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecipeScreen(
-    viewModel: RecipeViewModel = viewModel(),
+    recipeViewModel: RecipeViewModel = viewModel(),
     ingredientViewModel: IngredientViewModel = viewModel(),
     onGoToIngredients: () -> Unit
 ) {
 
-    val recipes by viewModel.recipes.collectAsState()
+    val recipes by recipeViewModel.recipes.collectAsState()
     val coroutineScope = rememberCoroutineScope()
 
     val sdf = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
@@ -49,13 +49,12 @@ fun RecipeScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var recipeToDelete by remember { mutableStateOf<Long?>(null) }
 
-    // ✅ FIX: state to hold ingredient info for the start dialog
     var startDialogIngredientInfo by remember { mutableStateOf<List<String>>(emptyList()) }
 
     LaunchedEffect(recipes) {
         recipes.forEach { recipe ->
             if (!recipeIngredientsMap.containsKey(recipe.id)) {
-                val links = viewModel.getIngredientsForRecipe(recipe.id)
+                val links = recipeViewModel.getIngredientsForRecipe(recipe.id)
                 val ingredientsWithQuantities = links.mapNotNull { link ->
                     val ingredient = ingredientViewModel.getIngredientById(link.ingredientId)
                     ingredient?.let {
@@ -185,9 +184,8 @@ fun RecipeScreen(
 
             val recipe = recipes.find { it.id == activeRecipe }
 
-            // ✅ FIX: load ingredient info in a coroutine, not directly in composable
             LaunchedEffect(activeRecipe) {
-                val links = viewModel.getIngredientsForRecipe(activeRecipe!!)
+                val links = recipeViewModel.getIngredientsForRecipe(activeRecipe!!)
                 startDialogIngredientInfo = links.mapNotNull { link ->
                     val ingredient = ingredientViewModel.getIngredientById(link.ingredientId)
                     ingredient?.let {
@@ -219,7 +217,6 @@ fun RecipeScreen(
                         Text("Ingredients to be used:", fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(4.dp))
 
-                        // ✅ FIX: use state list instead of direct suspend calls
                         if (startDialogIngredientInfo.isEmpty()) {
                             Text("Loading...")
                         } else {
@@ -241,7 +238,7 @@ fun RecipeScreen(
 
                         Button(onClick = {
                             coroutineScope.launch {
-                                val links = viewModel.getIngredientsForRecipe(activeRecipe!!)
+                                val links = recipeViewModel.getIngredientsForRecipe(activeRecipe!!)
 
                                 val insufficient = mutableListOf<String>()
 
@@ -327,7 +324,7 @@ fun RecipeScreen(
                     Button(onClick = {
                         coroutineScope.launch {
 
-                            val links = viewModel.getIngredientsForRecipe(activeRecipe!!)
+                            val links = recipeViewModel.getIngredientsForRecipe(activeRecipe!!)
 
                             links.forEach { link ->
                                 val ingredient =
@@ -381,7 +378,7 @@ fun RecipeScreen(
                     Button(
                         onClick = {
                             coroutineScope.launch {
-                                viewModel.deleteRecipeWithIngredients(recipeToDelete!!)
+                                recipeViewModel.deleteRecipeWithIngredients(recipeToDelete!!)
                                 showDeleteDialog = false
                                 recipeToDelete = null
                             }
