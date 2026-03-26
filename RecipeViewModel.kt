@@ -22,12 +22,14 @@ class RecipeViewModel(application: Application) : AndroidViewModel(application) 
         refresh()
     }
 
+    // Refresh the recipe list from the database
     fun refresh() {
         viewModelScope.launch {
             _recipes.value = recipeWrapper.getAll()
         }
     }
 
+    // Delete a recipe (single)
     fun deleteRecipe(recipe: RecipeEntity) {
         viewModelScope.launch {
             recipeWrapper.delete(recipe)
@@ -35,24 +37,24 @@ class RecipeViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    // ✅ NEW: REQUIRED FOR YOUR UI
+    // Delete a recipe AND all its ingredients in the join table
     fun deleteRecipeWithIngredients(recipeId: Long) {
         viewModelScope.launch {
-
-            // 🔥 delete join table entries FIRST
+            // Delete all recipe_ingredient_table entries first
             recipeWrapper.deleteIngredientsForRecipe(recipeId)
-
-            // 🔥 then delete the recipe itself
+            // Then delete the recipe itself
             recipeWrapper.deleteById(recipeId)
-
+            // Refresh the recipes list
             refresh()
         }
     }
 
+    // Get all ingredients for a specific recipe
     suspend fun getIngredientsForRecipe(recipeId: Long): List<RecipeIngredientEntity> {
         return recipeWrapper.getIngredientsForRecipe(recipeId)
     }
 
+    // Add ingredient to recipe
     suspend fun addIngredientToRecipe(
         recipeId: Long,
         ingredientId: Long,
@@ -62,6 +64,7 @@ class RecipeViewModel(application: Application) : AndroidViewModel(application) 
         recipeWrapper.addIngredientToRecipe(recipeId, ingredientId, quantityUsed, unitUsed)
     }
 
+    // Add recipe and return its ID
     suspend fun addRecipeAndReturnId(
         name: String,
         instructions: String,
