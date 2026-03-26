@@ -34,8 +34,10 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-fun formatQuantity(value: Double): String {
-    return if (value % 1.0 == 0.0) value.toInt().toString() else value.toString()
+// function to format our numbers to reduce decmial places
+fun formatDouble(value: Double): String {
+    val rounded = Math.round(value * 100) / 100.0
+    return if (rounded % 1.0 == 0.0) rounded.toInt().toString() else rounded.toString()
 }
 
 // Function to autosize text in buttons so no wrapping occurs
@@ -202,7 +204,7 @@ fun IngredientScreen(
                                         var unitDropdownExpanded by remember { mutableStateOf(false) }
 
                                         val displayQty = remember(
-                                            ingredient.quantity,
+                                            formatDouble(ingredient.quantity),
                                             ingredient.density,
                                             displayUnit
                                         ) {
@@ -219,7 +221,7 @@ fun IngredientScreen(
                                         ) {
                                             Text(
                                                 text = "${ingredient.name} ${
-                                                    formatQuantity(displayQty)
+                                                    formatDouble(displayQty)
                                                 }",
                                                 modifier = Modifier.weight(1f)
                                             )
@@ -266,7 +268,7 @@ fun IngredientScreen(
                                             }
                                         }
                                     } else {
-                                        Text("${ingredient.name} ${formatQuantity(ingredient.quantity)}")
+                                        Text("${ingredient.name} ${formatDouble(ingredient.quantity)}")
                                     }
 
 
