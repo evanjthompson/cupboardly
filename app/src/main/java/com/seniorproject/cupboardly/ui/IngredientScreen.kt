@@ -731,7 +731,7 @@ fun IngredientScreen(
 
                                 name = ""
                                 quantity = ""
-                                unit = ""
+                                unit = "g"
                                 price = ""
                                 showAddNew = false
                             }
