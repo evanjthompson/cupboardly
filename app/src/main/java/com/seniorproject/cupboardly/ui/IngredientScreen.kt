@@ -82,7 +82,7 @@ fun IngredientScreen(
 
     var name by remember { mutableStateOf("") }
     var quantity by remember { mutableStateOf("") }
-    var unit by remember { mutableStateOf("") }
+    var unit by remember { mutableStateOf("g") }
     var price by remember { mutableStateOf("") }
 
     val gold = Color(197,145,39)
