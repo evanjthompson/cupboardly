@@ -594,12 +594,10 @@ fun IngredientScreen(
                                         else -> {
 
                                             Spacer(modifier = Modifier.height(8.dp))
-                                            Text("Value of Ingredient: $${ingredient.price} ($${formatDouble(ingredient.pricePerUnit)} per ${ingredient.unit})")
+                                            Text("Value of Ingredient: $${formatDouble(ingredient.price)} ($${formatDouble(ingredient.pricePerUnit)} per ${ingredient.unit})")
                                             Text("Date Entered: ${sdf.format(Date(ingredient.dateEntered * 1000L))}")
                                             Text("Date Last Updated: ${sdf.format(Date(ingredient.dateLastUpdated * 1000L))}")
                                             Spacer(modifier = Modifier.height(5.dp))
-                                            //Text("Total Tracked All Time: ${convertFromGrams(ingredient.allTimeQuantity, ingredient.unit, ingredient.density)} ${ingredient.unit}")
-                                            //Text("Total Cost All Time: $${ingredient.allTimePrice}")
 
                                             Spacer(modifier = Modifier.height(12.dp))
 

@@ -96,7 +96,7 @@ fun RecipeScreen(
                             link.unitUsed,
                             it.density
                         )
-                        "${"%.2f".format(displayQty)} ${link.unitUsed} ${it.name}"
+                        "${formatDouble(displayQty)} ${link.unitUsed} ${it.name}"
                     }
                 }
                 recipeIngredientsMap[recipe.id] =
@@ -667,11 +667,18 @@ fun RecipeScreen(
                                 }
 
                                 links.forEach { link ->
-                                    val ingredient =
-                                        ingredientViewModel.getIngredientById(link.ingredientId)
+                                    val ingredient = ingredientViewModel.getIngredientById(link.ingredientId)
                                     ingredient?.let {
+                                        if (it.quantity <= 0.0) return@let  // safety
+
+                                        val usedQty = link.quantityUsed
+                                        val remainingQty = (it.quantity - usedQty).coerceAtLeast(0.0)
+                                        val pricePerUnit = if (it.quantity > 0.0) it.price / it.quantity else 0.0
+                                        val remainingPrice = pricePerUnit * remainingQty
+
                                         val updated = it.copy(
-                                            quantity = it.quantity - link.quantityUsed,
+                                            quantity = remainingQty,
+                                            price = remainingPrice,
                                             dateLastUpdated = (System.currentTimeMillis() / 1000).toInt()
                                         )
                                         ingredientViewModel.updateIngredient(updated)
