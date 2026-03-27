@@ -74,7 +74,6 @@ fun RecipeScreen(
     }
     var showAddDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
-    // NEW
     var showStartDialog by remember { mutableStateOf(false) }
     var activeRecipe by remember { mutableStateOf<Long?>(null) }
     var startError by remember { mutableStateOf<String?>(null) }
@@ -247,7 +246,7 @@ fun RecipeScreen(
                 onDismissRequest = { showMenu = false }
             ) {
 
-                // ➕ Add Recipe
+                // Add Recipe
                 DropdownMenuItem(
                     text = { Text("Add Recipe") },
                     onClick = {
@@ -256,12 +255,12 @@ fun RecipeScreen(
                     }
                 )
 
-                // 📷 Take Photo
+                // Take Photo
                 DropdownMenuItem(
                     text = { Text("Take Photo") },
                     onClick = {
                         if (hasCameraPermission) {
-                            // 1️⃣ Create a file for the photo
+                            // Create a file for the photo
                             val timestamp =
                                 SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
                             val photoFile = File(
@@ -269,7 +268,7 @@ fun RecipeScreen(
                                 "JPEG_${timestamp}_.jpg"
                             )
 
-                            // 2️⃣ Get a content URI using FileProvider
+                            // Get a content URI using FileProvider
                             val uri = FileProvider.getUriForFile(
                                 context,
                                 "${context.packageName}.fileprovider", // MUST match manifest
@@ -278,7 +277,7 @@ fun RecipeScreen(
 
                             photoUri = uri
 
-                            // 3️⃣ Launch the camera safely
+                            // Launch the camera safely
                             cameraLauncher.launch(uri)
                         } else {
                             // Request permission if not yet granted
@@ -547,11 +546,44 @@ fun RecipeScreen(
             )
         }
 
-        // ---------------- START RECIPE DIALOG ----------------
+        if (showDeleteDialog && recipeToDelete != null) {
 
-        // ONLY the relevant changed parts are shown inline with your original file
+            val recipeName = recipes.find { it.id == recipeToDelete }?.name ?: ""
 
-// ---------------- START RECIPE DIALOG ----------------
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+
+                title = { Text("Delete Recipe") },
+
+                text = {
+                    Text("Delete \"$recipeName\"? This cannot be undone.")
+                },
+
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                recipeViewModel.deleteRecipeWithIngredients(recipeToDelete!!)
+                                showDeleteDialog = false
+                                recipeToDelete = null
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                    ) {
+                        Text("Delete")
+                    }
+                },
+
+                dismissButton = {
+                    Button(onClick = {
+                        showDeleteDialog = false
+                        recipeToDelete = null
+                    }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
 
         if (showStartDialog && activeRecipe != null) {
 
@@ -566,18 +598,19 @@ fun RecipeScreen(
                             link.quantityUsed, link.unitUsed, it.density
                         )
 
-                        // ✅ FIX: clamp remaining to 0
                         val remainingGrams = (it.quantity - link.quantityUsed).coerceAtLeast(0.0)
 
                         val afterDisplay = ingredientViewModel.convertFromGrams(
                             remainingGrams, link.unitUsed, it.density
                         )
 
-                        "${it.name}: Use ${"%.2f".format(usedDisplay)} ${link.unitUsed}, " +
-                                "Remaining ${"%.2f".format(afterDisplay)} ${link.unitUsed}"
+                        "${it.name}: Use ${formatDouble(usedDisplay)} ${link.unitUsed}, " +
+                                "Remaining ${formatDouble(afterDisplay)} ${link.unitUsed}"
                     }
                 }
             }
+
+            // ---------------- START RECIPE DIALOG ----------------
 
             AlertDialog(
                 onDismissRequest = { showStartDialog = false },
