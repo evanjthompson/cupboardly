@@ -67,6 +67,7 @@ dependencies {
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-ai")
     implementation("com.google.guava:guava:31.1-android")
+    implementation("com.google.mlkit:text-recognition:16.0.0")
     {
         exclude(group = "com.google.guava", module = "listenablefuture")
     }

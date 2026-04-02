@@ -1,5 +1,7 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
 package com.seniorproject.cupboardly.ui
 
+import android.content.Context
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -41,7 +43,37 @@ import java.io.File
 import android.util.Log
 import androidx.core.content.ContextCompat
 import android.content.pm.PackageManager
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import androidx.compose.runtime.Composable
+
+
 @OptIn(ExperimentalMaterial3Api::class)
+
+fun processPhotoUri(context: Context, photoUri: Uri?) {
+    if (photoUri == null) return
+
+    try {
+        // Create an InputImage from the saved file URI
+        val image = InputImage.fromFilePath(context, photoUri)
+
+        // Create the text recognizer
+        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+
+        // Run text recognition
+        recognizer.process(image)
+            .addOnSuccessListener { visionText ->
+                Log.d("MLKit", "Detected text: ${visionText.text}")
+            }
+            .addOnFailureListener { e ->
+                Log.e("MLKit", "Text recognition failed", e)
+            }
+
+    } catch (e: Exception) {
+        Log.e("MLKit", "Failed to process image", e)
+    }
+}
 
 @Composable
 fun RecipeScreen(
@@ -65,8 +97,11 @@ fun RecipeScreen(
     ) { success ->
         if (success) {
             Log.d("Camera", "Photo saved: $photoUri")
+            // Pass context explicitly since processPhotoUri is no longer Composable
+            processPhotoUri(context, photoUri)
         }
     }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
