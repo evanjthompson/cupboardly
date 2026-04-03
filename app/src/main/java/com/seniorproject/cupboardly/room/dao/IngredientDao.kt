@@ -7,7 +7,7 @@ import com.seniorproject.cupboardly.room.entity.IngredientEntity
 interface IngredientDao {
 
     @Insert
-    suspend fun insert(ingredient: IngredientEntity)
+    suspend fun insert(ingredient: IngredientEntity): Long
 
     @Update
     suspend fun update(ingredient: IngredientEntity)

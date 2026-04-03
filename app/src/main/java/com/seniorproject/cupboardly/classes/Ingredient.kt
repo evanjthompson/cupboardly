@@ -2,98 +2,111 @@ package com.seniorproject.cupboardly.classes
 
 import android.content.Context
 import com.seniorproject.cupboardly.room.database.AppDatabase
+import com.seniorproject.cupboardly.room.entity.IngredientBatchEntity
 import com.seniorproject.cupboardly.room.entity.IngredientEntity
 
 class Ingredient(context: Context) {
 
     private val db = AppDatabase.getDatabase(context)
     private val ingredientDao = db.ingredientDao()
+    private val batchDao = db.ingredientBatchDao()
 
-    suspend fun addIngredient(
+    // -------------------------------
+    // Ingredient Definition
+    // -------------------------------
+
+    suspend fun addIngredientDefinition(
         name: String,
-        quantity: Double,
-        unit: String,
         density: Double,
-        price: Double,
-        dateEntered: Int,
-        dateLastUpdated: Int
-    ) {
-        val gramsToStore = convertToGrams(quantity, unit, density)
-
+        unit: String
+    ): Long {
         val existing = ingredientDao.getIngredientByName(name)
+        if (existing != null) return existing.id
 
-        if (existing != null) {
-            val newAllTimeQuantity = existing.allTimeQuantity + gramsToStore
-            val newAllTimePrice = existing.allTimePrice + price
-            val newQuantity = existing.quantity + gramsToStore
-            val newPrice = existing.price + price
-            val displayQty = convertFromGrams(newQuantity, existing.unit, existing.density)
+        val ingredient = IngredientEntity(
+            name = name,
+            density = density,
+            unit = unit
+        )
 
-            val updatedIngredient = existing.copy(
-                quantity = newQuantity,
-                price = newPrice,
-                allTimeQuantity = newAllTimeQuantity,
-                allTimePrice = newAllTimePrice,
-                pricePerUnit = if (displayQty > 0) newPrice / displayQty else 0.0,
-                dateLastUpdated = dateLastUpdated
-            )
-            ingredientDao.update(updatedIngredient)
-        } else {
-            val ingredient = IngredientEntity(
-                name = name,
-                quantity = gramsToStore,
-                unit = unit,
-                density = density,
-                price = price,
-                pricePerUnit = if (quantity > 0) price / quantity else 0.0,
-                allTimeQuantity = gramsToStore,
-                allTimePrice = price,
-                dateEntered = dateEntered,
-                dateLastUpdated = dateLastUpdated
-            )
-            ingredientDao.insert(ingredient)
-        }
+        val id = ingredientDao.insert(ingredient)
+        return id
+    }
+
+    suspend fun updateIngredientDefinition(updatedIngredient: IngredientEntity) {
+        val existing = ingredientDao.getIngredientById(updatedIngredient.id) ?: return
+
+        // Only update name, density, and unit
+        val finalIngredient = existing.copy(
+            name = updatedIngredient.name,
+            density = updatedIngredient.density,
+            unit = updatedIngredient.unit
+        )
+        ingredientDao.update(finalIngredient)
+    }
+
+    suspend fun deleteIngredientDefinition(ingredient: IngredientEntity) {
+        ingredientDao.delete(ingredient)
     }
 
     suspend fun getIngredientByName(name: String): IngredientEntity? {
         return ingredientDao.getIngredientByName(name)
     }
 
-    suspend fun updateIngredient(updatedIngredient: IngredientEntity) {
-        val existing = ingredientDao.getIngredientById(updatedIngredient.id)
-            ?: return
-
-        val deltaQuantity = updatedIngredient.quantity - existing.quantity
-        val deltaPrice = updatedIngredient.price - existing.price
-
-        val newAllTimeQuantity = existing.allTimeQuantity + deltaQuantity
-        val newAllTimePrice = existing.allTimePrice + deltaPrice
-
-        val finalIngredient = updatedIngredient.copy(
-            allTimeQuantity = newAllTimeQuantity,
-            allTimePrice = newAllTimePrice,
-            pricePerUnit = if (updatedIngredient.quantity > 0) {
-                val displayQty = convertFromGrams(
-                    updatedIngredient.quantity,
-                    updatedIngredient.unit,
-                    updatedIngredient.density
-                )
-                if (displayQty > 0) updatedIngredient.price / displayQty else 0.0
-            } else 0.0
-        )
-
-        ingredientDao.update(finalIngredient)
-    }
-
     suspend fun getIngredientById(id: Long): IngredientEntity? {
-        return ingredientDao.getAllIngredients().find { it.id == id }
+        return ingredientDao.getIngredientById(id)
     }
 
-    suspend fun getAll(): List<IngredientEntity> {
+    suspend fun getAllIngredients(): List<IngredientEntity> {
         return ingredientDao.getAllIngredients()
     }
 
-    suspend fun delete(ingredient: IngredientEntity) {
-        ingredientDao.delete(ingredient)
+    // -------------------------------
+    // Ingredient Batches
+    // -------------------------------
+
+    suspend fun addBatch(
+        ingredientId: Long,
+        quantity: Double,       // grams
+        price: Double,
+        expirationDate: Int?,   // optional
+        dateAdded: Int
+    ) {
+        val batch = IngredientBatchEntity(
+            ingredientId = ingredientId,
+            quantity = quantity,
+            price = price,
+            expirationDate = expirationDate,
+            dateAdded = dateAdded
+        )
+        batchDao.insert(batch)
+    }
+
+    suspend fun updateBatch(batch: IngredientBatchEntity) {
+        batchDao.update(batch)
+    }
+
+    suspend fun deleteBatch(batch: IngredientBatchEntity) {
+        batchDao.delete(batch)
+    }
+
+    suspend fun getBatchesForIngredient(ingredientId: Long): List<IngredientBatchEntity> {
+        return batchDao.getBatchesForIngredient(ingredientId)
+    }
+
+    suspend fun getTotalQuantity(ingredientId: Long): Double {
+        return batchDao.getTotalQuantity(ingredientId) ?: 0.0
+    }
+
+    // -------------------------------
+    // Unit conversion helpers
+    // -------------------------------
+
+    fun convertFromGrams(grams: Double, unit: String, density: Double?): Double {
+        return com.seniorproject.cupboardly.classes.convertFromGrams(grams, unit, density)
+    }
+
+    fun convertToGrams(amount: Double, unit: String, density: Double?): Double {
+        return com.seniorproject.cupboardly.classes.convertToGrams(amount, unit, density)
     }
 }
