@@ -15,7 +15,6 @@ interface RecipeDao {
     @Delete
     suspend fun delete(recipe: RecipeEntity)
 
-    // ✅ NEW (required for your delete flow)
     @Query("DELETE FROM recipe_table WHERE id = :recipeId")
     suspend fun deleteById(recipeId: Long)
 
