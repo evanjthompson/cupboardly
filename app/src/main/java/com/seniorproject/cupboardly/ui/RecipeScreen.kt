@@ -288,7 +288,7 @@ fun RecipeScreen(
             }
         }
 
-        // FAB + dropdown
+        // dropdown
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -402,9 +402,6 @@ fun RecipeScreen(
                                     val densityValue = askGeminiForDensity(trimmedName)
 
                                     // Creates the ingredient definition with a zero-qty placeholder
-                                    // batch so it appears in the list. No stock is actually added.
-                                    // If you want a definition-only path, add addIngredientDefinitionOnly()
-                                    // to IngredientViewModel.
                                     ingredientViewModel.addIngredient(
                                         name = trimmedName,
                                         quantity = 0.0,
@@ -440,7 +437,6 @@ fun RecipeScreen(
                             "ml", "cup", "tbsp", "tsp", "floz"
                         )
 
-                        // allIngredients is List<IngredientWithQuantity> — unwrap .ingredient
                         LazyColumn(
                             modifier = Modifier
                                 .height(250.dp)

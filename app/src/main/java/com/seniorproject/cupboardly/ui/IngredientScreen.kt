@@ -90,7 +90,7 @@ fun AutoSizeText(
 }
 
 // ---------------------------------------------------------------------------
-// Shared text field colors — full black for readability
+// Shared text field colors
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -223,7 +223,7 @@ fun IngredientScreen(
                         var displayUnit by remember { mutableStateOf(ingredient.unit) }
                         LaunchedEffect(ingredient.unit) { displayUnit = ingredient.unit }
 
-                        // Edit form state — name only (no unit dropdown)
+                        // Edit form state — name only
                         var editName by remember { mutableStateOf(ingredient.name) }
                         var editNameError by remember { mutableStateOf<String?>(null) }
 
@@ -962,7 +962,7 @@ fun IngredientScreen(
             }
 
             // -----------------------------------------------------------------------
-            // FAB — open Add New dialog
+            // open Add New dialog
             // -----------------------------------------------------------------------
             Button(
                 onClick = { showAddNew = true },
