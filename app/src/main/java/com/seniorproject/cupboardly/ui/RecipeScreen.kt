@@ -32,7 +32,6 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import com.seniorproject.cupboardly.classes.askGeminiForDensity
 import android.net.Uri
 import android.os.Environment
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -47,21 +46,17 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import androidx.compose.runtime.Composable
+import com.seniorproject.cupboardly.room.entity.IngredientBatchEntity
 
-
-@OptIn(ExperimentalMaterial3Api::class)
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 fun processPhotoUri(context: Context, photoUri: Uri?) {
     if (photoUri == null) return
-
     try {
-        // Create an InputImage from the saved file URI
         val image = InputImage.fromFilePath(context, photoUri)
-
-        // Create the text recognizer
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-
-        // Run text recognition
         recognizer.process(image)
             .addOnSuccessListener { visionText ->
                 Log.d("MLKit", "Detected text: ${visionText.text}")
@@ -69,11 +64,42 @@ fun processPhotoUri(context: Context, photoUri: Uri?) {
             .addOnFailureListener { e ->
                 Log.e("MLKit", "Text recognition failed", e)
             }
-
     } catch (e: Exception) {
         Log.e("MLKit", "Failed to process image", e)
     }
 }
+
+/**
+ * Deducts [gramsNeeded] from an ingredient's batches using FIFO order (oldest first).
+ * Fully consumed batches are deleted; the last partially consumed batch is updated.
+ */
+suspend fun deductFromBatchesFifo(
+    ingredientId: Long,
+    gramsNeeded: Double,
+    ingredientViewModel: IngredientViewModel
+) {
+    val batches = ingredientViewModel
+        .getBatchesForIngredient(ingredientId)
+        .sortedBy { it.dateAdded } // oldest first
+
+    var remaining = gramsNeeded
+
+    for (batch in batches) {
+        if (remaining <= 0.0) break
+
+        if (batch.quantity <= remaining) {
+            remaining -= batch.quantity
+            ingredientViewModel.deleteBatch(batch)
+        } else {
+            ingredientViewModel.updateBatch(batch.copy(quantity = batch.quantity - remaining))
+            remaining = 0.0
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Screen
+// ---------------------------------------------------------------------------
 
 @Composable
 fun RecipeScreen(
@@ -84,7 +110,10 @@ fun RecipeScreen(
     var hasCameraPermission by remember { mutableStateOf(false) }
 
     val recipes by recipeViewModel.recipes.collectAsState()
-    val allIngredients by ingredientViewModel.ingredients.collectAsState(initial = emptyList())
+
+    // allIngredients is now List<IngredientWithQuantity>
+    val allIngredients by ingredientViewModel.ingredients.collectAsState()
+
     val coroutineScope = rememberCoroutineScope()
     val sdf = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
     val recipeIngredientsMap = remember { mutableStateMapOf<Long, String>() }
@@ -97,7 +126,6 @@ fun RecipeScreen(
     ) { success ->
         if (success) {
             Log.d("Camera", "Photo saved: $photoUri")
-            // Pass context explicitly since processPhotoUri is no longer Composable
             processPhotoUri(context, photoUri)
         }
     }
@@ -107,6 +135,7 @@ fun RecipeScreen(
     ) { isGranted ->
         hasCameraPermission = isGranted
     }
+
     var showAddDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var showStartDialog by remember { mutableStateOf(false) }
@@ -114,11 +143,12 @@ fun RecipeScreen(
     var startError by remember { mutableStateOf<String?>(null) }
     var startDialogIngredientInfo by remember { mutableStateOf<List<String>>(emptyList()) }
 
-    // Override / delete dialogs
     var showOverrideConfirmDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var recipeToDelete by remember { mutableStateOf<Long?>(null) }
 
+    // Build the ingredient summary string for each recipe card.
+    // getIngredientById returns IngredientEntity directly, so .density etc. are still valid.
     LaunchedEffect(recipes) {
         recipes.forEach { recipe ->
             if (!recipeIngredientsMap.containsKey(recipe.id)) {
@@ -134,11 +164,11 @@ fun RecipeScreen(
                         "${formatDouble(displayQty)} ${link.unitUsed} ${it.name}"
                     }
                 }
-                recipeIngredientsMap[recipe.id] =
-                    ingredientsWithQuantities.joinToString(", ")
+                recipeIngredientsMap[recipe.id] = ingredientsWithQuantities.joinToString(", ")
             }
         }
     }
+
     LaunchedEffect(Unit) {
         if (ContextCompat.checkSelfPermission(
                 context,
@@ -150,6 +180,7 @@ fun RecipeScreen(
             permissionLauncher.launch(android.Manifest.permission.CAMERA)
         }
     }
+
     val gold = Color(197, 145, 39)
     val darkBlue = Color(11, 186, 224)
 
@@ -171,12 +202,10 @@ fun RecipeScreen(
                 .fillMaxSize()
                 .padding(16.dp)
         ) {
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-
                 Button(
                     onClick = onGoToIngredients,
                     modifier = Modifier.weight(1f),
@@ -192,7 +221,6 @@ fun RecipeScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
-
                 Button(
                     onClick = {},
                     modifier = Modifier.weight(2f),
@@ -220,13 +248,11 @@ fun RecipeScreen(
                             .animateContentSize()
                             .clickable { expanded = !expanded }
                     ) {
-
                         Column(modifier = Modifier.padding(16.dp)) {
 
                             Text(recipe.name)
 
                             if (expanded) {
-
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text("Ingredients: $ingredientText")
                                 Text("Instructions: ${recipe.instructions}")
@@ -262,12 +288,12 @@ fun RecipeScreen(
             }
         }
 
+        // dropdown
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(35.dp)
         ) {
-
             Button(
                 onClick = { showMenu = true },
                 modifier = Modifier.size(64.dp),
@@ -280,42 +306,27 @@ fun RecipeScreen(
                 expanded = showMenu,
                 onDismissRequest = { showMenu = false }
             ) {
-
-                // Add Recipe
                 DropdownMenuItem(
                     text = { Text("Add Recipe") },
-                    onClick = {
-                        showMenu = false
-                        showAddDialog = true
-                    }
+                    onClick = { showMenu = false; showAddDialog = true }
                 )
-
-                // Take Photo
                 DropdownMenuItem(
                     text = { Text("Take Photo") },
                     onClick = {
                         if (hasCameraPermission) {
-                            // Create a file for the photo
-                            val timestamp =
-                                SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+                            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
                             val photoFile = File(
                                 context.getExternalFilesDir(Environment.DIRECTORY_PICTURES),
                                 "JPEG_${timestamp}_.jpg"
                             )
-
-                            // Get a content URI using FileProvider
                             val uri = FileProvider.getUriForFile(
                                 context,
-                                "${context.packageName}.fileprovider", // MUST match manifest
+                                "${context.packageName}.fileprovider",
                                 photoFile
                             )
-
                             photoUri = uri
-
-                            // Launch the camera safely
                             cameraLauncher.launch(uri)
                         } else {
-                            // Request permission if not yet granted
                             permissionLauncher.launch(android.Manifest.permission.CAMERA)
                         }
                     }
@@ -338,7 +349,6 @@ fun RecipeScreen(
             AlertDialog(
                 onDismissRequest = { showAddDialog = false },
                 title = { Text("Add New Recipe") },
-
                 text = {
                     val scrollState = rememberScrollState()
 
@@ -349,13 +359,9 @@ fun RecipeScreen(
                             .verticalScroll(scrollState),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-
                         OutlinedTextField(
                             value = name,
-                            onValueChange = {
-                                name = it
-                                nameError = false
-                            },
+                            onValueChange = { name = it; nameError = false },
                             label = { Text("Recipe Name") },
                             isError = nameError
                         )
@@ -373,10 +379,7 @@ fun RecipeScreen(
                         Row {
                             OutlinedTextField(
                                 value = newIngredientName,
-                                onValueChange = {
-                                    newIngredientName = it
-                                    ingredientError = null
-                                },
+                                onValueChange = { newIngredientName = it; ingredientError = null },
                                 label = { Text("Ingredient Name") },
                                 modifier = Modifier.weight(1f)
                             )
@@ -388,8 +391,7 @@ fun RecipeScreen(
                                 if (trimmedName.isBlank()) return@Button
 
                                 coroutineScope.launch {
-                                    val existing =
-                                        ingredientViewModel.getIngredientByName(trimmedName)
+                                    val existing = ingredientViewModel.getIngredientByName(trimmedName)
                                     if (existing != null) {
                                         ingredientError = "Ingredient already exists"
                                         return@launch
@@ -399,20 +401,20 @@ fun RecipeScreen(
                                     val currentDate = (System.currentTimeMillis() / 1000).toInt()
                                     val densityValue = askGeminiForDensity(trimmedName)
 
+                                    // Creates the ingredient definition with a zero-qty placeholder
                                     ingredientViewModel.addIngredient(
                                         name = trimmedName,
                                         quantity = 0.0,
-                                        unit = "",
+                                        unit = "g",
                                         density = densityValue,
                                         price = 0.0,
-                                        dateEntered = currentDate,
-                                        dateLastUpdated = currentDate
+                                        dateEntered = currentDate
                                     )
 
-                                    val created =
-                                        ingredientViewModel.getIngredientByName(trimmedName)
+                                    val created = ingredientViewModel.getIngredientByName(trimmedName)
                                     created?.let {
                                         selectedIngredients[it.id] = "1.0"
+                                        selectedUnits[it.id] = "g"
                                     }
 
                                     newIngredientName = ""
@@ -430,25 +432,18 @@ fun RecipeScreen(
 
                         Text("Select Ingredients", fontWeight = FontWeight.Bold)
 
+                        val unitOptions = listOf(
+                            "unit", "g", "kg", "oz", "lb",
+                            "ml", "cup", "tbsp", "tsp", "floz"
+                        )
+
                         LazyColumn(
                             modifier = Modifier
                                 .height(250.dp)
                                 .fillMaxWidth()
                         ) {
-                            val unitOptions = listOf(
-                                "unit",
-                                "g",
-                                "kg",
-                                "oz",
-                                "lb",
-                                "ml",
-                                "cup",
-                                "tbsp",
-                                "tsp",
-                                "floz"
-                            )
-
-                            items(allIngredients, key = { it.id }) { ingredient ->
+                            items(allIngredients, key = { it.ingredient.id }) { ingredientWithQty ->
+                                val ingredient = ingredientWithQty.ingredient
 
                                 val isSelected = selectedIngredients.containsKey(ingredient.id)
                                 var unitDropdownExpanded by remember { mutableStateOf(false) }
@@ -457,7 +452,6 @@ fun RecipeScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-
                                     Checkbox(
                                         checked = isSelected,
                                         onCheckedChange = { checked ->
@@ -511,7 +505,6 @@ fun RecipeScreen(
                                                     .fillMaxWidth(),
                                                 singleLine = true
                                             )
-
                                             ExposedDropdownMenu(
                                                 expanded = unitDropdownExpanded,
                                                 onDismissRequest = { unitDropdownExpanded = false }
@@ -533,13 +526,9 @@ fun RecipeScreen(
                         }
                     }
                 },
-
                 confirmButton = {
                     Button(onClick = {
-                        if (name.isBlank()) {
-                            nameError = true
-                            return@Button
-                        }
+                        if (name.isBlank()) { nameError = true; return@Button }
 
                         coroutineScope.launch {
                             val currentDate = (System.currentTimeMillis() / 1000).toInt()
@@ -550,18 +539,16 @@ fun RecipeScreen(
                             selectedIngredients.forEach { (id, qtyString) ->
                                 val qty = qtyString.toDoubleOrNull() ?: 0.0
                                 if (qty > 0) {
-                                    val ingredient = allIngredients.find { it.id == id }
-                                    val selectedUnit = selectedUnits[id] ?: ingredient?.unit ?: "g"
+                                    // ingredient here is the IngredientEntity, found via id
+                                    val ingredientEntity = allIngredients
+                                        .find { it.ingredient.id == id }?.ingredient
+                                    val selectedUnit = selectedUnits[id]
+                                        ?: ingredientEntity?.unit ?: "g"
                                     val gramsToStore = ingredientViewModel.convertToGrams(
-                                        qty,
-                                        selectedUnit,
-                                        ingredient?.density
+                                        qty, selectedUnit, ingredientEntity?.density
                                     )
                                     recipeViewModel.addIngredientToRecipe(
-                                        recipeId,
-                                        id,
-                                        gramsToStore,
-                                        selectedUnit
+                                        recipeId, id, gramsToStore, selectedUnit
                                     )
                                 }
                             }
@@ -571,29 +558,21 @@ fun RecipeScreen(
                         }
                     }) { Text("Save") }
                 },
-
-
                 dismissButton = {
-                    Button(onClick = { showAddDialog = false }) {
-                        Text("Cancel")
-                    }
+                    Button(onClick = { showAddDialog = false }) { Text("Cancel") }
                 }
             )
         }
 
-        if (showDeleteDialog && recipeToDelete != null) {
+        // ---------------- DELETE RECIPE DIALOG ----------------
 
+        if (showDeleteDialog && recipeToDelete != null) {
             val recipeName = recipes.find { it.id == recipeToDelete }?.name ?: ""
 
             AlertDialog(
                 onDismissRequest = { showDeleteDialog = false },
-
                 title = { Text("Delete Recipe") },
-
-                text = {
-                    Text("Delete \"$recipeName\"? This cannot be undone.")
-                },
-
+                text = { Text("Delete \"$recipeName\"? This cannot be undone.") },
                 confirmButton = {
                     Button(
                         onClick = {
@@ -604,37 +583,35 @@ fun RecipeScreen(
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
-                    ) {
-                        Text("Delete")
-                    }
+                    ) { Text("Delete") }
                 },
-
                 dismissButton = {
-                    Button(onClick = {
-                        showDeleteDialog = false
-                        recipeToDelete = null
-                    }) {
+                    Button(onClick = { showDeleteDialog = false; recipeToDelete = null }) {
                         Text("Cancel")
                     }
                 }
             )
         }
 
+        // ---------------- START RECIPE DIALOG ----------------
+
         if (showStartDialog && activeRecipe != null) {
 
             val recipe = recipes.find { it.id == activeRecipe }
 
+            // Build the per-ingredient preview: "Use X unit, Remaining Y unit"
+            // Total quantity now comes from summing batches via getTotalQuantity().
             LaunchedEffect(activeRecipe) {
                 val links = recipeViewModel.getIngredientsForRecipe(activeRecipe!!)
                 startDialogIngredientInfo = links.mapNotNull { link ->
                     val ingredient = ingredientViewModel.getIngredientById(link.ingredientId)
                     ingredient?.let {
+                        val totalGrams = ingredientViewModel.getTotalQuantity(it.id)
+
                         val usedDisplay = ingredientViewModel.convertFromGrams(
                             link.quantityUsed, link.unitUsed, it.density
                         )
-
-                        val remainingGrams = (it.quantity - link.quantityUsed).coerceAtLeast(0.0)
-
+                        val remainingGrams = (totalGrams - link.quantityUsed).coerceAtLeast(0.0)
                         val afterDisplay = ingredientViewModel.convertFromGrams(
                             remainingGrams, link.unitUsed, it.density
                         )
@@ -645,15 +622,11 @@ fun RecipeScreen(
                 }
             }
 
-            // ---------------- START RECIPE DIALOG ----------------
-
             AlertDialog(
                 onDismissRequest = { showStartDialog = false },
                 title = { Text("Start Recipe") },
-
                 text = {
                     Column {
-
                         Text("Instructions:", fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(recipe?.instructions ?: "")
@@ -666,33 +639,30 @@ fun RecipeScreen(
                         if (startDialogIngredientInfo.isEmpty()) {
                             Text("Loading...")
                         } else {
-                            startDialogIngredientInfo.forEach { info ->
-                                Text(info)
-                            }
+                            startDialogIngredientInfo.forEach { info -> Text(info) }
                         }
 
                         Spacer(modifier = Modifier.height(12.dp))
-
-                        startError?.let {
-                            Text(it, color = Color.Red)
-                        }
+                        startError?.let { Text(it, color = Color.Red) }
                     }
                 },
-
                 confirmButton = {
                     Column {
-
                         Button(onClick = {
                             coroutineScope.launch {
                                 val links = recipeViewModel.getIngredientsForRecipe(activeRecipe!!)
                                 val insufficient = mutableListOf<String>()
 
+                                // Check totals across all batches for each ingredient
                                 links.forEach { link ->
                                     val ingredient =
                                         ingredientViewModel.getIngredientById(link.ingredientId)
-                                    if (ingredient != null && ingredient.quantity < link.quantityUsed) {
-                                        // unchanged (no "(not enough)")
-                                        insufficient.add("${ingredient.name}")
+                                    if (ingredient != null) {
+                                        val totalGrams =
+                                            ingredientViewModel.getTotalQuantity(ingredient.id)
+                                        if (totalGrams < link.quantityUsed) {
+                                            insufficient.add(ingredient.name)
+                                        }
                                     }
                                 }
 
@@ -701,22 +671,16 @@ fun RecipeScreen(
                                     return@launch
                                 }
 
+                                // Deduct from batches FIFO for each ingredient
                                 links.forEach { link ->
-                                    val ingredient = ingredientViewModel.getIngredientById(link.ingredientId)
-                                    ingredient?.let {
-                                        if (it.quantity <= 0.0) return@let  // safety
-
-                                        val usedQty = link.quantityUsed
-                                        val remainingQty = (it.quantity - usedQty).coerceAtLeast(0.0)
-                                        val pricePerUnit = if (it.quantity > 0.0) it.price / it.quantity else 0.0
-                                        val remainingPrice = pricePerUnit * remainingQty
-
-                                        val updated = it.copy(
-                                            quantity = remainingQty,
-                                            price = remainingPrice,
-                                            dateLastUpdated = (System.currentTimeMillis() / 1000).toInt()
+                                    val ingredient =
+                                        ingredientViewModel.getIngredientById(link.ingredientId)
+                                    if (ingredient != null) {
+                                        deductFromBatchesFifo(
+                                            ingredientId = ingredient.id,
+                                            gramsNeeded = link.quantityUsed,
+                                            ingredientViewModel = ingredientViewModel
                                         )
-                                        ingredientViewModel.updateIngredient(updated)
                                     }
                                 }
 
@@ -728,7 +692,6 @@ fun RecipeScreen(
 
                         if (!startError.isNullOrBlank()) {
                             Spacer(modifier = Modifier.height(8.dp))
-
                             Button(
                                 onClick = { showOverrideConfirmDialog = true },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
@@ -738,46 +701,44 @@ fun RecipeScreen(
                         }
                     }
                 },
-
                 dismissButton = {
-                    Button(onClick = { showStartDialog = false }) {
-                        Text("Cancel")
-                    }
+                    Button(onClick = { showStartDialog = false }) { Text("Cancel") }
                 }
             )
         }
 
-// ---------------- OVERRIDE CONFIRM DIALOG ----------------
+        // ---------------- OVERRIDE CONFIRM DIALOG ----------------
 
         if (showOverrideConfirmDialog && activeRecipe != null) {
 
             AlertDialog(
                 onDismissRequest = { showOverrideConfirmDialog = false },
-
                 title = { Text("Are you sure?") },
-
-                // ✅ FIX: show missing ingredients
                 text = {
                     Text(
                         "You don't have enough ingredients:\n\n${startError ?: ""}\n\nContinue anyway?"
                     )
                 },
-
                 confirmButton = {
                     Button(onClick = {
                         coroutineScope.launch {
                             val links = recipeViewModel.getIngredientsForRecipe(activeRecipe!!)
 
+                            // Deduct whatever is available from batches FIFO,
+                            // capped at what each ingredient actually has.
                             links.forEach { link ->
                                 val ingredient =
                                     ingredientViewModel.getIngredientById(link.ingredientId)
-                                ingredient?.let {
-                                    if (it.quantity >= link.quantityUsed) {
-                                        val updated = it.copy(
-                                            quantity = it.quantity - link.quantityUsed,
-                                            dateLastUpdated = (System.currentTimeMillis() / 1000).toInt()
+                                if (ingredient != null) {
+                                    val totalGrams =
+                                        ingredientViewModel.getTotalQuantity(ingredient.id)
+                                    val gramsToDeduct = minOf(link.quantityUsed, totalGrams)
+                                    if (gramsToDeduct > 0.0) {
+                                        deductFromBatchesFifo(
+                                            ingredientId = ingredient.id,
+                                            gramsNeeded = gramsToDeduct,
+                                            ingredientViewModel = ingredientViewModel
                                         )
-                                        ingredientViewModel.updateIngredient(updated)
                                     }
                                 }
                             }
@@ -786,15 +747,10 @@ fun RecipeScreen(
                             showStartDialog = false
                             startError = null
                         }
-                    }) {
-                        Text("Yes, Continue")
-                    }
+                    }) { Text("Yes, Continue") }
                 },
-
                 dismissButton = {
-                    Button(onClick = { showOverrideConfirmDialog = false }) {
-                        Text("Cancel")
-                    }
+                    Button(onClick = { showOverrideConfirmDialog = false }) { Text("Cancel") }
                 }
             )
         }

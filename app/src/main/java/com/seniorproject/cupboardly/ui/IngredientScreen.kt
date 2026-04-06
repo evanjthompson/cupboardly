@@ -27,20 +27,44 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
-import androidx.room.util.copy
 import com.seniorproject.cupboardly.classes.askGeminiForDensity
+import com.seniorproject.cupboardly.room.entity.IngredientBatchEntity
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// function to format our numbers to reduce decmial places
+// ---------------------------------------------------------------------------
+// Utilities
+// ---------------------------------------------------------------------------
+
 fun formatDouble(value: Double): String {
     val rounded = Math.round(value * 100) / 100.0
     return if (rounded % 1.0 == 0.0) rounded.toInt().toString() else rounded.toString()
 }
 
-// Function to autosize text in buttons so no wrapping occurs
+/** Parse a "YYYY-MM-DD" string into a Unix timestamp (seconds), or null if blank/invalid. */
+fun parseDateToUnix(dateStr: String): Int? {
+    if (dateStr.isBlank()) return null
+    return try {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val date = sdf.parse(dateStr.trim()) ?: return null
+        (date.time / 1000).toInt()
+    } catch (e: Exception) {
+        null
+    }
+}
+
+fun unixToDateStr(unix: Int?): String {
+    if (unix == null) return ""
+    return try {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        sdf.format(Date(unix * 1000L))
+    } catch (e: Exception) {
+        ""
+    }
+}
+
 @Composable
 fun AutoSizeText(
     text: String,
@@ -50,7 +74,6 @@ fun AutoSizeText(
     style: TextStyle = LocalTextStyle.current
 ) {
     var fontSize by remember { mutableStateOf(maxFontSize) }
-
     Text(
         text = text,
         modifier = modifier,
@@ -65,40 +88,66 @@ fun AutoSizeText(
         }
     )
 }
+
+// ---------------------------------------------------------------------------
+// Shared text field colors
+// ---------------------------------------------------------------------------
+
+@Composable
+fun darkTextFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedTextColor = Color.Black,
+    unfocusedTextColor = Color.Black,
+    disabledTextColor = Color.Black,
+    focusedLabelColor = Color.Black,
+    unfocusedLabelColor = Color(0xFF444444),
+    disabledLabelColor = Color(0xFF444444),
+    focusedBorderColor = Color.Black,
+    unfocusedBorderColor = Color(0xFF888888),
+    focusedTrailingIconColor = Color.Black,
+    unfocusedTrailingIconColor = Color(0xFF444444),
+    focusedSupportingTextColor = Color.Black,
+    unfocusedSupportingTextColor = Color(0xFF444444),
+    cursorColor = Color.Black
+)
+
+// ---------------------------------------------------------------------------
+// Screen
+// ---------------------------------------------------------------------------
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-
 fun IngredientScreen(
     viewModel: IngredientViewModel = viewModel(),
     onGoToRecipes: () -> Unit
 ) {
-
     val scope = rememberCoroutineScope()
+    val sdf = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
 
-    val sdf = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
-    val ingredients by viewModel.ingredients.collectAsState(initial = emptyList())
+    val ingredients by viewModel.ingredients.collectAsState()
 
+    // Add-new dialog state
     var showAddNew by remember { mutableStateOf(false) }
+    var newName by remember { mutableStateOf("") }
+    var newQuantity by remember { mutableStateOf("") }
+    var newUnit by remember { mutableStateOf("g") }
+    var newPrice by remember { mutableStateOf("") }
+    var newExpirationStr by remember { mutableStateOf("") }
 
-    var name by remember { mutableStateOf("") }
-    var quantity by remember { mutableStateOf("") }
-    var unit by remember { mutableStateOf("g") }
-    var price by remember { mutableStateOf("") }
+    var newNameError by remember { mutableStateOf<String?>(null) }
+    var newQuantityError by remember { mutableStateOf<String?>(null) }
+    var newPriceError by remember { mutableStateOf<String?>(null) }
 
-    val gold = Color(197,145,39)
-    val darkBlue = Color(11,186,224)
-    val headerPink1 = Color(255,150,174)
-    val headerBlue2 = Color(105,150,156)
+    val gold = Color(197, 145, 39)
+    val darkBlue = Color(11, 186, 224)
 
-    var nameError by remember { mutableStateOf<String?>(null) }
-    var quantityError by remember { mutableStateOf<String?>(null) }
-    var priceError by remember { mutableStateOf<String?>(null) }
-
-    Box(modifier = Modifier
-        .fillMaxSize()
-        .safeDrawingPadding()) {
-
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .safeDrawingPadding()
+    ) {
         Box(modifier = Modifier.fillMaxSize()) {
+
+            // Background
             Image(
                 painter = painterResource(id = R.drawable.stripeingredientbg),
                 contentDescription = "Ingredient Background",
@@ -111,7 +160,7 @@ fun IngredientScreen(
                     .fillMaxSize()
                     .padding(16.dp)
             ) {
-
+                // Tab row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -126,7 +175,6 @@ fun IngredientScreen(
                     ) {
                         Text("Ingredients", fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     }
-
                     Button(
                         onClick = onGoToRecipes,
                         modifier = Modifier.weight(1f),
@@ -145,36 +193,68 @@ fun IngredientScreen(
                     Text("No ingredients yet")
                 }
 
+                // ---------------------------------------------------------------------------
+                // Ingredient list
+                // ---------------------------------------------------------------------------
                 LazyColumn {
                     items(
                         items = ingredients,
-                        key = { it.id }
-                    ) { ingredient ->
+                        key = { it.ingredient.id }
+                    ) { ingredientWithQty ->
 
-                        val displayQty = viewModel.convertFromGrams(
-                            ingredient.quantity,
-                            ingredient.unit,
-                            ingredient.density
-                        )
+                        val ingredient = ingredientWithQty.ingredient
+                        val totalQuantityGrams = ingredientWithQty.totalQuantity
 
+                        // Card state
                         var expanded by remember { mutableStateOf(false) }
                         var isEditing by remember { mutableStateOf(false) }
                         var isAddingMore by remember { mutableStateOf(false) }
 
-                        var editNameError by remember { mutableStateOf<String?>(null) }
-                        var editQuantityError by remember { mutableStateOf<String?>(null) }
-                        var editPriceError by remember { mutableStateOf<String?>(null) }
+                        var batches by remember {
+                            mutableStateOf<List<IngredientBatchEntity>>(emptyList())
+                        }
 
+                        LaunchedEffect(expanded, totalQuantityGrams) {
+                            if (expanded) {
+                                batches = viewModel.getBatchesForIngredient(ingredient.id)
+                            }
+                        }
+
+                        var displayUnit by remember { mutableStateOf(ingredient.unit) }
+                        LaunchedEffect(ingredient.unit) { displayUnit = ingredient.unit }
+
+                        // Edit form state — name only
+                        var editName by remember { mutableStateOf(ingredient.name) }
+                        var editNameError by remember { mutableStateOf<String?>(null) }
+
+                        // Which batch is currently being edited in edit mode (null = none)
+                        var editingBatchId by remember { mutableStateOf<Long?>(null) }
+
+                        // Per-batch edit state — keyed by batch id, populated when a batch row is tapped
+                        var batchEditQuantity by remember { mutableStateOf("") }
+                        var batchEditUnit by remember { mutableStateOf(ingredient.unit) }
+                        var batchEditPrice by remember { mutableStateOf("") }
+                        var batchEditExpirationStr by remember { mutableStateOf("") }
+                        var batchEditQuantityError by remember { mutableStateOf<String?>(null) }
+                        var batchEditPriceError by remember { mutableStateOf<String?>(null) }
+
+                        // Add-more batch state
+                        var addMoreQuantity by remember { mutableStateOf("") }
+                        var addMoreUnit by remember { mutableStateOf(ingredient.unit) }
+                        var addMorePrice by remember { mutableStateOf("") }
+                        var addMoreExpirationStr by remember { mutableStateOf("") }
                         var addMoreQuantityError by remember { mutableStateOf<String?>(null) }
                         var addMorePriceError by remember { mutableStateOf<String?>(null) }
 
-                        var editName by remember { mutableStateOf(ingredient.name) }
-                        var editQuantity by remember { mutableStateOf(ingredient.quantity.toString()) }
-                        var editUnit by remember { mutableStateOf(ingredient.unit) }
-                        var editPrice by remember { mutableStateOf(ingredient.price.toString()) }
-
-                        var addMoreQuantity by remember { mutableStateOf("") }
-                        var addMorePrice by remember { mutableStateOf("") }
+                        // Derived display quantity (total in current display unit)
+                        val displayQty =
+                            remember(totalQuantityGrams, ingredient.density, displayUnit) {
+                                viewModel.convertFromGrams(
+                                    totalQuantityGrams,
+                                    displayUnit,
+                                    ingredient.density
+                                )
+                            }
 
                         Surface(
                             shape = RoundedCornerShape(10.dp),
@@ -185,7 +265,14 @@ fun IngredientScreen(
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
                                 .animateContentSize()
-                                .clickable { expanded = !expanded }
+                                .clickable {
+                                    expanded = !expanded
+                                    if (!expanded) {
+                                        isEditing = false
+                                        isAddingMore = false
+                                        editingBatchId = null
+                                    }
+                                }
                         ) {
                             Column(
                                 modifier = Modifier
@@ -193,44 +280,36 @@ fun IngredientScreen(
                                     .padding(16.dp)
                             ) {
 
-                                if (!isEditing && !isAddingMore && ingredient.unit != "unit") {
-                                        val unitOptions = listOf(
-                                            "g",
-                                            "kg",
-                                            "oz",
-                                            "lb",
-                                            "ml",
-                                            "gal",
-                                            "cup",
-                                            "tbsp",
-                                            "tsp",
-                                            "floz"
+                                // -----------------------------------------------------------
+                                // Header row: name + quantity + live unit switcher
+                                // -----------------------------------------------------------
+                                when {
+                                    isEditing -> {
+                                        Text(
+                                            text = editName.ifBlank { ingredient.name },
+                                            fontWeight = FontWeight.SemiBold
                                         )
-                                        var displayUnit by remember { mutableStateOf(ingredient.unit) }
+                                    }
+
+                                    ingredient.unit == "unit" -> {
+                                        Text("${ingredient.name}  ${formatDouble(totalQuantityGrams)} ${ingredient.unit}")
+                                    }
+
+                                    else -> {
+                                        val unitOptions = listOf(
+                                            "g", "kg", "oz", "lb",
+                                            "ml", "gal", "cup", "tbsp", "tsp", "floz"
+                                        )
                                         var unitDropdownExpanded by remember { mutableStateOf(false) }
-
-
-                                        val displayQty = remember(
-                                            formatDouble(ingredient.quantity),
-                                            ingredient.density,
-                                            displayUnit
-                                        ) {
-                                            viewModel.convertFromGrams(
-                                                ingredient.quantity,
-                                                displayUnit,
-                                                ingredient.density
-                                            )
-                                        }
 
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
                                             modifier = Modifier.fillMaxWidth()
                                         ) {
                                             Text(
-                                                text = "${ingredient.name} ${
-                                                    formatDouble(displayQty)
-                                                }",
-                                                modifier = Modifier.weight(1f)
+                                                text = "${ingredient.name}  ${formatDouble(displayQty)}",
+                                                modifier = Modifier.weight(1f),
+                                                fontWeight = FontWeight.SemiBold
                                             )
 
                                             ExposedDropdownMenuBox(
@@ -239,6 +318,7 @@ fun IngredientScreen(
                                                 modifier = Modifier.width(110.dp)
                                             ) {
                                                 OutlinedTextField(
+                                                    colors = darkTextFieldColors(),
                                                     value = displayUnit,
                                                     onValueChange = {},
                                                     readOnly = true,
@@ -249,22 +329,20 @@ fun IngredientScreen(
                                                     },
                                                     modifier = Modifier
                                                         .menuAnchor(
-                                                            type = ExposedDropdownMenuAnchorType.PrimaryNotEditable,
-                                                            enabled = true
+                                                            ExposedDropdownMenuAnchorType.PrimaryNotEditable,
+                                                            true
                                                         )
                                                         .fillMaxWidth(),
                                                     singleLine = true
                                                 )
-
                                                 ExposedDropdownMenu(
+                                                    containerColor = Color.White,
                                                     expanded = unitDropdownExpanded,
-                                                    onDismissRequest = {
-                                                        unitDropdownExpanded = false
-                                                    }
+                                                    onDismissRequest = { unitDropdownExpanded = false }
                                                 ) {
                                                     unitOptions.forEach { option ->
                                                         DropdownMenuItem(
-                                                            text = { Text(option) },
+                                                            text = { Text(option, color = Color.Black) },
                                                             onClick = {
                                                                 displayUnit = option
                                                                 unitDropdownExpanded = false
@@ -274,38 +352,104 @@ fun IngredientScreen(
                                                 }
                                             }
                                         }
-                                    } else if (isEditing) {
-                                    val liveQty = editQuantity.toDoubleOrNull() ?: 0.0
-                                    Text("${editName.ifBlank { ingredient.name }} ${formatDouble(liveQty)} $editUnit")
-                                } else {
-                                    Text("${ingredient.name} ${formatDouble(displayQty)} ${ingredient.unit}")
+                                    }
                                 }
 
-
+                                // -----------------------------------------------------------
+                                // Expanded content
+                                // -----------------------------------------------------------
                                 if (expanded) {
                                     when {
-                                        isAddingMore -> {
 
+                                        // -------------------------------------------------------
+                                        // ADD MORE: create a new batch
+                                        // -------------------------------------------------------
+                                        isAddingMore -> {
                                             Spacer(modifier = Modifier.height(8.dp))
 
-                                            OutlinedTextField(
-                                                value = addMoreQuantity,
-                                                onValueChange = { addMoreQuantity = it; addMoreQuantityError = null },
-                                                label = { Text("Add Quantity") },
-                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                                isError = addMoreQuantityError != null,
-                                                supportingText = {
-                                                    addMoreQuantityError?.let {
-                                                        Text(it, color = MaterialTheme.colorScheme.error)
+                                            // Quantity + unit row
+                                            val addMoreUnitOptions = if (ingredient.unit == "unit") {
+                                                listOf("unit")
+                                            } else {
+                                                listOf("g", "kg", "oz", "lb", "ml", "gal", "cup", "tbsp", "tsp", "floz")
+                                            }
+                                            var addMoreUnitDropdownExpanded by remember { mutableStateOf(false) }
+
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                OutlinedTextField(
+                                                    colors = darkTextFieldColors(),
+                                                    value = addMoreQuantity,
+                                                    onValueChange = {
+                                                        addMoreQuantity = it
+                                                        addMoreQuantityError = null
+                                                    },
+                                                    label = { Text("Quantity") },
+                                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                    isError = addMoreQuantityError != null,
+                                                    supportingText = {
+                                                        addMoreQuantityError?.let {
+                                                            Text(it, color = MaterialTheme.colorScheme.error)
+                                                        }
+                                                    },
+                                                    modifier = Modifier.weight(1f)
+                                                )
+
+                                                if (ingredient.unit != "unit") {
+                                                    ExposedDropdownMenuBox(
+                                                        expanded = addMoreUnitDropdownExpanded,
+                                                        onExpandedChange = { addMoreUnitDropdownExpanded = it },
+                                                        modifier = Modifier.weight(1f)
+                                                    ) {
+                                                        OutlinedTextField(
+                                                            colors = darkTextFieldColors(),
+                                                            value = addMoreUnit,
+                                                            onValueChange = {},
+                                                            readOnly = true,
+                                                            label = { Text("Unit") },
+                                                            trailingIcon = {
+                                                                ExposedDropdownMenuDefaults.TrailingIcon(
+                                                                    addMoreUnitDropdownExpanded
+                                                                )
+                                                            },
+                                                            modifier = Modifier
+                                                                .menuAnchor(
+                                                                    ExposedDropdownMenuAnchorType.PrimaryNotEditable,
+                                                                    true
+                                                                )
+                                                                .fillMaxWidth()
+                                                        )
+                                                        ExposedDropdownMenu(
+                                                            containerColor = Color.White,
+                                                            expanded = addMoreUnitDropdownExpanded,
+                                                            onDismissRequest = { addMoreUnitDropdownExpanded = false }
+                                                        ) {
+                                                            addMoreUnitOptions.forEach { option ->
+                                                                DropdownMenuItem(
+                                                                    text = { Text(option, color = Color.Black) },
+                                                                    onClick = {
+                                                                        addMoreUnit = option
+                                                                        // Keep display unit in sync
+                                                                        displayUnit = option
+                                                                        addMoreUnitDropdownExpanded = false
+                                                                    }
+                                                                )
+                                                            }
+                                                        }
                                                     }
-                                                },
-                                                modifier = Modifier.fillMaxWidth()
-                                            )
+                                                }
+                                            }
 
                                             OutlinedTextField(
+                                                colors = darkTextFieldColors(),
                                                 value = addMorePrice,
-                                                onValueChange = { addMorePrice = it; addMorePriceError = null },
-                                                label = { Text("Price of Additional Quantity") },
+                                                onValueChange = {
+                                                    addMorePrice = it
+                                                    addMorePriceError = null
+                                                },
+                                                label = { Text("Price of this batch ($)") },
                                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                                 isError = addMorePriceError != null,
                                                 supportingText = {
@@ -316,6 +460,13 @@ fun IngredientScreen(
                                                 modifier = Modifier.fillMaxWidth()
                                             )
 
+                                            OutlinedTextField(
+                                                value = addMoreExpirationStr,
+                                                onValueChange = { addMoreExpirationStr = it },
+                                                label = { Text("Expiration Date (YYYY-MM-DD, optional)") },
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
                                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -323,7 +474,9 @@ fun IngredientScreen(
                                                 Button(
                                                     onClick = {
                                                         addMoreQuantity = ""
+                                                        addMoreUnit = ingredient.unit
                                                         addMorePrice = ""
+                                                        addMoreExpirationStr = ""
                                                         addMoreQuantityError = null
                                                         addMorePriceError = null
                                                         isAddingMore = false
@@ -342,32 +495,33 @@ fun IngredientScreen(
                                                             addMoreQuantityError = "Quantity must be > 0"
                                                             valid = false
                                                         }
-                                                        if (priceValue == null || priceValue <= 0) {
-                                                            addMorePriceError = "Enter new price"
+                                                        if (priceValue == null || priceValue < 0) {
+                                                            addMorePriceError = "Enter a valid price"
                                                             valid = false
                                                         }
 
                                                         if (valid) {
+                                                            // Convert from whatever unit the user picked into grams
+                                                            val gramsToAdd = viewModel.convertToGrams(
+                                                                quantityValue!!,
+                                                                addMoreUnit,
+                                                                ingredient.density
+                                                            )
                                                             val currentDate = (System.currentTimeMillis() / 1000).toInt()
-                                                            val gramsToAdd = viewModel.convertToGrams(quantityValue!!, ingredient.unit, ingredient.density)
-                                                            val newQuantity = ingredient.quantity + gramsToAdd
-                                                            val newPrice = ingredient.price + priceValue!!
-                                                            val displayQty = viewModel.convertFromGrams(newQuantity, ingredient.unit, ingredient.density)
-                                                            val newPricePerUnit = if (displayQty > 0) newPrice / displayQty else 0.0
+                                                            val expirationDate = parseDateToUnix(addMoreExpirationStr)
 
-                                                            val updatedIngredient = ingredient.copy(
-                                                                quantity = newQuantity,
-                                                                price = newPrice,
-                                                                pricePerUnit = newPricePerUnit,
-                                                                allTimeQuantity = ingredient.allTimeQuantity + gramsToAdd,
-                                                                allTimePrice = ingredient.allTimePrice + priceValue,
-                                                                dateLastUpdated = currentDate
+                                                            viewModel.addBatch(
+                                                                ingredientId = ingredient.id,
+                                                                quantity = gramsToAdd,
+                                                                price = priceValue!!,
+                                                                expirationDate = expirationDate,
+                                                                dateAdded = currentDate
                                                             )
 
-                                                            viewModel.updateIngredient(updatedIngredient)
-
                                                             addMoreQuantity = ""
+                                                            addMoreUnit = ingredient.unit
                                                             addMorePrice = ""
+                                                            addMoreExpirationStr = ""
                                                             isAddingMore = false
                                                         }
                                                     },
@@ -377,11 +531,15 @@ fun IngredientScreen(
                                             }
                                         }
 
+                                        // -------------------------------------------------------
+                                        // EDIT: modify ingredient name; tap a batch to edit it
+                                        // -------------------------------------------------------
                                         isEditing -> {
-
                                             Spacer(modifier = Modifier.height(8.dp))
 
+                                            // Name field only — no unit dropdown
                                             OutlinedTextField(
+                                                colors = darkTextFieldColors(),
                                                 value = editName,
                                                 onValueChange = { editName = it; editNameError = null },
                                                 label = { Text("Name (currently ${ingredient.name})") },
@@ -394,117 +552,265 @@ fun IngredientScreen(
                                                 modifier = Modifier.fillMaxWidth()
                                             )
 
-                                            val originalQtyInSelectedUnit = viewModel.convertFromGrams(
-                                                ingredient.quantity,
-                                                editUnit,
-                                                ingredient.density
-                                            )
+                                            Spacer(modifier = Modifier.height(8.dp))
 
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                            ) {
-                                                OutlinedTextField(
-                                                    value = editQuantity,
-                                                    onValueChange = {
-                                                        editQuantity = it
-                                                        editQuantityError = null
-                                                    },
-                                                    label = {
-                                                        Text("Quantity (currently ${formatDouble(originalQtyInSelectedUnit)} $editUnit)")
-                                                    },
-                                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                                    isError = editQuantityError != null,
-                                                    supportingText = {
-                                                        editQuantityError?.let {
-                                                            Text(it, color = MaterialTheme.colorScheme.error)
-                                                        }
-                                                    },
-                                                    modifier = Modifier.weight(1f)
+                                            // Batch list — tappable rows
+                                            if (batches.isEmpty()) {
+                                                Text(
+                                                    "No batches recorded",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = Color.Gray
                                                 )
-                                                var editUnitDropdownExpanded by remember { mutableStateOf(false) }
-
-                                                val unitOptions = listOf(
-                                                    "g", "kg", "oz", "lb", "ml", "gal", "cup", "tbsp", "tsp", "floz"
+                                            } else {
+                                                Text(
+                                                    "Tap a batch to edit or delete it:",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = Color.Gray
                                                 )
+                                                Spacer(modifier = Modifier.height(4.dp))
 
-                                                ExposedDropdownMenuBox(
-                                                    expanded = editUnitDropdownExpanded,
-                                                    onExpandedChange = { editUnitDropdownExpanded = it },
-                                                    modifier = Modifier.weight(1f)
-                                                ) {
-                                                    OutlinedTextField(
-                                                        value = editUnit,
-                                                        onValueChange = {},
-                                                        readOnly = true,
-                                                        label = { Text("Unit") },
-                                                        trailingIcon = {
-                                                            ExposedDropdownMenuDefaults.TrailingIcon(editUnitDropdownExpanded)
-                                                        },
-                                                        modifier = Modifier
-                                                            .menuAnchor(
-                                                                type = ExposedDropdownMenuAnchorType.PrimaryNotEditable,
-                                                                enabled = true
-                                                            )
-                                                            .fillMaxWidth()
+                                                batches.forEach { batch ->
+                                                    val isThisBatchEditing = editingBatchId == batch.id
+                                                    val batchDisplayQty = viewModel.convertFromGrams(
+                                                        batch.quantity, displayUnit, ingredient.density
                                                     )
 
-                                                    ExposedDropdownMenu(
-                                                        expanded = editUnitDropdownExpanded,
-                                                        onDismissRequest = { editUnitDropdownExpanded = false }
-                                                    ) {
-                                                        unitOptions.forEach { option ->
-                                                            DropdownMenuItem(
-                                                                text = { Text(option) },
-                                                                onClick = {
-                                                                    val currentQty = editQuantity.toDoubleOrNull()
-
-                                                                    if (currentQty != null) {
-                                                                        // Convert current value → grams → new unit
-                                                                        val grams = viewModel.convertToGrams(
-                                                                            currentQty,
-                                                                            editUnit,
-                                                                            ingredient.density
-                                                                        )
-
-                                                                        val newDisplayQty = viewModel.convertFromGrams(
-                                                                            grams,
-                                                                            option,
-                                                                            ingredient.density
-                                                                        )
-
-                                                                        editQuantity = formatDouble(newDisplayQty)
-                                                                    }
-
-                                                                    editUnit = option
-                                                                    editUnitDropdownExpanded = false
-                                                                }
-                                                            )
+                                                    if (isThisBatchEditing) {
+                                                        // Inline batch edit form
+                                                        val batchEditUnitOptions = if (ingredient.unit == "unit") {
+                                                            listOf("unit")
+                                                        } else {
+                                                            listOf("g", "kg", "oz", "lb", "ml", "gal", "cup", "tbsp", "tsp", "floz")
                                                         }
+                                                        var batchEditUnitDropdownExpanded by remember { mutableStateOf(false) }
+
+                                                        Surface(
+                                                            shape = RoundedCornerShape(6.dp),
+                                                            color = Color.White,
+                                                            border = BorderStroke(1.dp, gold),
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .padding(vertical = 4.dp)
+                                                        ) {
+                                                            Column(modifier = Modifier.padding(8.dp)) {
+                                                                Row(
+                                                                    modifier = Modifier.fillMaxWidth(),
+                                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                                ) {
+                                                                    OutlinedTextField(
+                                                                        colors = darkTextFieldColors(),
+                                                                        value = batchEditQuantity,
+                                                                        onValueChange = {
+                                                                            batchEditQuantity = it
+                                                                            batchEditQuantityError = null
+                                                                        },
+                                                                        label = { Text("Quantity") },
+                                                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                                        isError = batchEditQuantityError != null,
+                                                                        supportingText = {
+                                                                            batchEditQuantityError?.let {
+                                                                                Text(it, color = MaterialTheme.colorScheme.error)
+                                                                            }
+                                                                        },
+                                                                        modifier = Modifier.weight(1f)
+                                                                    )
+
+                                                                    if (ingredient.unit != "unit") {
+                                                                        ExposedDropdownMenuBox(
+                                                                            expanded = batchEditUnitDropdownExpanded,
+                                                                            onExpandedChange = { batchEditUnitDropdownExpanded = it },
+                                                                            modifier = Modifier.weight(1f)
+                                                                        ) {
+                                                                            OutlinedTextField(
+                                                                                colors = darkTextFieldColors(),
+                                                                                value = batchEditUnit,
+                                                                                onValueChange = {},
+                                                                                readOnly = true,
+                                                                                label = { Text("Unit") },
+                                                                                trailingIcon = {
+                                                                                    ExposedDropdownMenuDefaults.TrailingIcon(
+                                                                                        batchEditUnitDropdownExpanded
+                                                                                    )
+                                                                                },
+                                                                                modifier = Modifier
+                                                                                    .menuAnchor(
+                                                                                        ExposedDropdownMenuAnchorType.PrimaryNotEditable,
+                                                                                        true
+                                                                                    )
+                                                                                    .fillMaxWidth()
+                                                                            )
+                                                                            ExposedDropdownMenu(
+                                                                                containerColor = Color.White,
+                                                                                expanded = batchEditUnitDropdownExpanded,
+                                                                                onDismissRequest = { batchEditUnitDropdownExpanded = false }
+                                                                            ) {
+                                                                                batchEditUnitOptions.forEach { option ->
+                                                                                    DropdownMenuItem(
+                                                                                        text = { Text(option, color = Color.Black) },
+                                                                                        onClick = {
+                                                                                            batchEditUnit = option
+                                                                                            displayUnit = option
+                                                                                            batchEditUnitDropdownExpanded = false
+                                                                                        }
+                                                                                    )
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+
+                                                                OutlinedTextField(
+                                                                    colors = darkTextFieldColors(),
+                                                                    value = batchEditPrice,
+                                                                    onValueChange = {
+                                                                        batchEditPrice = it
+                                                                        batchEditPriceError = null
+                                                                    },
+                                                                    label = { Text("Price ($)") },
+                                                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                                    isError = batchEditPriceError != null,
+                                                                    supportingText = {
+                                                                        batchEditPriceError?.let {
+                                                                            Text(it, color = MaterialTheme.colorScheme.error)
+                                                                        }
+                                                                    },
+                                                                    modifier = Modifier.fillMaxWidth()
+                                                                )
+
+                                                                OutlinedTextField(
+                                                                    value = batchEditExpirationStr,
+                                                                    onValueChange = { batchEditExpirationStr = it },
+                                                                    label = { Text("Expiration Date (YYYY-MM-DD, optional)") },
+                                                                    modifier = Modifier.fillMaxWidth()
+                                                                )
+
+                                                                Row(
+                                                                    modifier = Modifier.fillMaxWidth(),
+                                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                                ) {
+                                                                    // Cancel batch edit
+                                                                    Button(
+                                                                        onClick = {
+                                                                            editingBatchId = null
+                                                                            batchEditQuantityError = null
+                                                                            batchEditPriceError = null
+                                                                        },
+                                                                        colors = ButtonDefaults.buttonColors(containerColor = gold),
+                                                                        modifier = Modifier.weight(1f)
+                                                                    ) { Text("Cancel") }
+
+                                                                    // Save batch changes
+                                                                    Button(
+                                                                        onClick = {
+                                                                            val qVal = batchEditQuantity.toDoubleOrNull()
+                                                                            val pVal = batchEditPrice.toDoubleOrNull()
+                                                                            var valid = true
+
+                                                                            if (qVal == null || qVal <= 0) {
+                                                                                batchEditQuantityError = "Quantity must be > 0"
+                                                                                valid = false
+                                                                            }
+                                                                            if (pVal == null || pVal < 0) {
+                                                                                batchEditPriceError = "Enter a valid price"
+                                                                                valid = false
+                                                                            }
+
+                                                                            if (valid) {
+                                                                                val newGrams = viewModel.convertToGrams(
+                                                                                    qVal!!,
+                                                                                    batchEditUnit,
+                                                                                    ingredient.density
+                                                                                )
+                                                                                val newExpiration = parseDateToUnix(batchEditExpirationStr)
+                                                                                viewModel.updateBatch(
+                                                                                    batch.copy(
+                                                                                        quantity = newGrams,
+                                                                                        price = pVal!!,
+                                                                                        expirationDate = newExpiration
+                                                                                    )
+                                                                                )
+                                                                                editingBatchId = null
+                                                                            }
+                                                                        },
+                                                                        colors = ButtonDefaults.buttonColors(containerColor = gold),
+                                                                        modifier = Modifier.weight(1f)
+                                                                    ) { Text("Save") }
+
+                                                                    // Delete this batch
+                                                                    Button(
+                                                                        onClick = {
+                                                                            viewModel.deleteBatch(batch)
+                                                                            editingBatchId = null
+                                                                        },
+                                                                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                                                                        modifier = Modifier.weight(0.75f)
+                                                                    ) {
+                                                                        AutoSizeText(
+                                                                            text = "Delete",
+                                                                            maxFontSize = 16.sp,
+                                                                            minFontSize = 8.sp,
+                                                                            modifier = Modifier.fillMaxWidth()
+                                                                        )
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    } else {
+                                                        // Tappable batch summary row
+                                                        val addedText = "Added ${sdf.format(Date(batch.dateAdded * 1000L))}"
+                                                        val expirationText = batch.expirationDate?.let {
+                                                            "  ·  Expires ${sdf.format(Date(it * 1000L))}"
+                                                        } ?: ""
+
+                                                        Surface(
+                                                            shape = RoundedCornerShape(4.dp),
+                                                            color = Color(0xFFF5F5F5),
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .padding(vertical = 3.dp)
+                                                                .clickable {
+                                                                    // Populate edit fields from this batch
+                                                                    editingBatchId = batch.id
+                                                                    batchEditUnit = displayUnit
+                                                                    batchEditQuantity = formatDouble(
+                                                                        viewModel.convertFromGrams(
+                                                                            batch.quantity,
+                                                                            displayUnit,
+                                                                            ingredient.density
+                                                                        )
+                                                                    )
+                                                                    batchEditPrice = formatDouble(batch.price)
+                                                                    batchEditExpirationStr = unixToDateStr(batch.expirationDate)
+                                                                    batchEditQuantityError = null
+                                                                    batchEditPriceError = null
+                                                                }
+                                                        ) {
+                                                            Column(modifier = Modifier.padding(8.dp)) {
+                                                                Text(
+                                                                    "${formatDouble(batchDisplayQty)} $displayUnit  —  $${formatDouble(batch.price)}",
+                                                                    style = MaterialTheme.typography.bodyMedium
+                                                                )
+                                                                Text(
+                                                                    "$addedText$expirationText",
+                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                    color = Color.Gray
+                                                                )
+                                                            }
+                                                        }
+                                                        HorizontalDivider(color = Color(0xFFEEEEEE))
                                                     }
                                                 }
                                             }
 
-                                            OutlinedTextField(
-                                                value = editPrice,
-                                                onValueChange = { editPrice = it; editPriceError = null },
-                                                label = { Text("Price (currently ${ingredient.price})") },
-                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                                isError = editPriceError != null,
-                                                supportingText = {
-                                                    editPriceError?.let {
-                                                        Text(it, color = MaterialTheme.colorScheme.error)
-                                                    }
-                                                },
-                                                modifier = Modifier.fillMaxWidth()
-                                            )
+                                            Spacer(modifier = Modifier.height(12.dp))
 
+                                            // Confirm name / Cancel / Delete ingredient
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
                                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                                             ) {
                                                 Button(
-                                                    onClick = { isEditing = false },
+                                                    onClick = { isEditing = false; editingBatchId = null },
                                                     colors = ButtonDefaults.buttonColors(containerColor = gold),
                                                     modifier = Modifier.weight(1f)
                                                 ) { Text("Cancel") }
@@ -512,29 +818,15 @@ fun IngredientScreen(
                                                 Button(
                                                     onClick = {
                                                         val trimmedName = editName.trim()
-                                                        val displayQuantity = editQuantity.toDoubleOrNull()
-                                                        val priceValue = editPrice.toDoubleOrNull()
-
                                                         var valid = true
 
                                                         if (trimmedName.isBlank()) {
                                                             editNameError = "Enter a name"
                                                             valid = false
                                                         }
-
-                                                        if (displayQuantity == null || displayQuantity <= 0) {
-                                                            editQuantityError = "Quantity > 0"
-                                                            valid = false
-                                                        }
-
-                                                        if (priceValue == null || priceValue < 0) {
-                                                            editPriceError = "Price >= 0"
-                                                            valid = false
-                                                        }
-
                                                         if (ingredients.any {
-                                                                it.id != ingredient.id &&
-                                                                        it.name.equals(trimmedName, ignoreCase = true)
+                                                                it.ingredient.id != ingredient.id &&
+                                                                        it.ingredient.name.equals(trimmedName, ignoreCase = true)
                                                             }
                                                         ) {
                                                             editNameError = "Name already exists"
@@ -542,33 +834,11 @@ fun IngredientScreen(
                                                         }
 
                                                         if (valid) {
-                                                            val currentDate = (System.currentTimeMillis() / 1000).toInt()
-
-                                                            val oldPrice = ingredient.price
-
-                                                            // Convert display → grams
-                                                            val gramsQuantity = viewModel.convertToGrams(
-                                                                displayQuantity!!,
-                                                                editUnit,
-                                                                ingredient.density
+                                                            viewModel.updateIngredient(
+                                                                ingredient.copy(name = trimmedName)
                                                             )
-
-                                                            val deltaQuantity = gramsQuantity - ingredient.quantity
-                                                            val deltaPrice = priceValue!! - oldPrice
-
-                                                            val updatedIngredient = ingredient.copy(
-                                                                name = trimmedName,
-                                                                quantity = gramsQuantity,
-                                                                unit = editUnit,
-                                                                price = priceValue,
-                                                                pricePerUnit = priceValue / displayQuantity,
-                                                                allTimeQuantity = ingredient.allTimeQuantity + deltaQuantity,
-                                                                allTimePrice = ingredient.allTimePrice + deltaPrice,
-                                                                dateLastUpdated = currentDate
-                                                            )
-
-                                                            viewModel.updateIngredient(updatedIngredient)
                                                             isEditing = false
+                                                            editingBatchId = null
                                                         }
                                                     },
                                                     colors = ButtonDefaults.buttonColors(containerColor = gold),
@@ -579,25 +849,77 @@ fun IngredientScreen(
                                                     onClick = {
                                                         viewModel.deleteIngredient(ingredient)
                                                         isEditing = false
+                                                        editingBatchId = null
                                                     },
                                                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                                                     modifier = Modifier.weight(0.75f)
-                                                ) { AutoSizeText(
-                                                    text = "Delete",
-                                                    maxFontSize = 16.sp,
-                                                    minFontSize = 8.sp,
-                                                    modifier = Modifier.fillMaxWidth()
-                                                )}
+                                                ) {
+                                                    AutoSizeText(
+                                                        text = "Delete",
+                                                        maxFontSize = 16.sp,
+                                                        minFontSize = 8.sp,
+                                                        modifier = Modifier.fillMaxWidth()
+                                                    )
+                                                }
                                             }
                                         }
 
+                                        // -------------------------------------------------------
+                                        // DEFAULT: show batch list (read-only) + action buttons
+                                        // -------------------------------------------------------
                                         else -> {
-
                                             Spacer(modifier = Modifier.height(8.dp))
-                                            Text("Value of Ingredient: $${formatDouble(ingredient.price)} ($${formatDouble(ingredient.pricePerUnit)} per ${ingredient.unit})")
-                                            Text("Date Entered: ${sdf.format(Date(ingredient.dateEntered * 1000L))}")
-                                            Text("Date Last Updated: ${sdf.format(Date(ingredient.dateLastUpdated * 1000L))}")
-                                            Spacer(modifier = Modifier.height(5.dp))
+
+                                            val totalPrice = batches.sumOf { it.price }
+                                            val totalCostPerUnit = if (displayQty > 0) totalPrice / displayQty else 0.0
+                                            Text(
+                                                "Total value: $${formatDouble(totalPrice)}  ·  Cost/unit: $${formatDouble(totalCostPerUnit)} /$displayUnit",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Medium
+                                            )
+
+                                            Spacer(modifier = Modifier.height(6.dp))
+
+                                            if (batches.isEmpty()) {
+                                                Text(
+                                                    "No batches recorded",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = Color.Gray
+                                                )
+                                            } else {
+                                                batches.forEach { batch ->
+                                                    val batchDisplayQty = viewModel.convertFromGrams(
+                                                        batch.quantity, displayUnit, ingredient.density
+                                                    )
+                                                    val batchCostPerUnit =
+                                                        if (batchDisplayQty > 0) batch.price / batchDisplayQty else 0.0
+                                                    val addedText = "Added ${sdf.format(Date(batch.dateAdded * 1000L))}"
+                                                    val expirationText = batch.expirationDate?.let {
+                                                        "  ·  Expires ${sdf.format(Date(it * 1000L))}"
+                                                    } ?: ""
+
+                                                    // Read-only row — no delete button
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(vertical = 3.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Column(modifier = Modifier.weight(1f)) {
+                                                            Text(
+                                                                "${formatDouble(batchDisplayQty)} $displayUnit  —  $${formatDouble(batch.price)}  ·  $${formatDouble(batchCostPerUnit)}/$displayUnit",
+                                                                style = MaterialTheme.typography.bodyMedium
+                                                            )
+                                                            Text(
+                                                                "$addedText$expirationText",
+                                                                style = MaterialTheme.typography.bodySmall,
+                                                                color = Color.Gray
+                                                            )
+                                                        }
+                                                    }
+                                                    HorizontalDivider(color = Color(0xFFEEEEEE))
+                                                }
+                                            }
 
                                             Spacer(modifier = Modifier.height(12.dp))
 
@@ -610,7 +932,9 @@ fun IngredientScreen(
                                                         isAddingMore = true
                                                         isEditing = false
                                                         addMoreQuantity = ""
+                                                        addMoreUnit = ingredient.unit
                                                         addMorePrice = ""
+                                                        addMoreExpirationStr = ""
                                                     },
                                                     colors = ButtonDefaults.buttonColors(containerColor = gold),
                                                     modifier = Modifier.weight(1f)
@@ -620,23 +944,13 @@ fun IngredientScreen(
                                                     onClick = {
                                                         isEditing = true
                                                         isAddingMore = false
-
                                                         editName = ingredient.name
-                                                        editUnit = ingredient.unit
-                                                        editPrice = ingredient.price.toString()
-
-                                                        val displayQty = viewModel.convertFromGrams(
-                                                            ingredient.quantity,
-                                                            ingredient.unit,
-                                                            ingredient.density
-                                                        )
-
-                                                        editQuantity = formatDouble(displayQty)
+                                                        editNameError = null
+                                                        editingBatchId = null
                                                     },
                                                     colors = ButtonDefaults.buttonColors(containerColor = gold),
                                                     modifier = Modifier.weight(1f)
                                                 ) { Text("Edit") }
-
                                             }
                                         }
                                     }
@@ -647,6 +961,9 @@ fun IngredientScreen(
                 }
             }
 
+            // -----------------------------------------------------------------------
+            // open Add New dialog
+            // -----------------------------------------------------------------------
             Button(
                 onClick = { showAddNew = true },
                 modifier = Modifier
@@ -657,7 +974,7 @@ fun IngredientScreen(
                     containerColor = gold,
                     contentColor = Color.White
                 ),
-                contentPadding = PaddingValues(0.dp) // Remove default padding
+                contentPadding = PaddingValues(0.dp)
             ) {
                 Box(
                     contentAlignment = Alignment.Center,
@@ -667,40 +984,48 @@ fun IngredientScreen(
                 }
             }
 
+            // -----------------------------------------------------------------------
+            // Add New dialog — creates ingredient definition + first batch
+            // -----------------------------------------------------------------------
             if (showAddNew) {
-
-                var expanded by remember { mutableStateOf(false) }
+                var dialogDropdownExpanded by remember { mutableStateOf(false) }
 
                 val matchingIngredients = ingredients.filter {
-                    it.name.contains(name.trim(), ignoreCase = true) && name.isNotBlank()
+                    it.ingredient.name.contains(newName.trim(), ignoreCase = true) &&
+                            newName.isNotBlank()
                 }
 
                 AlertDialog(
-                    onDismissRequest = { showAddNew = false },
-
+                    containerColor = Color.White,
+                    titleContentColor = Color.Black,
+                    textContentColor = Color.Black,
+                    onDismissRequest = {
+                        showAddNew = false
+                        newName = ""; newQuantity = ""; newUnit = "g"; newPrice = ""
+                        newExpirationStr = ""
+                        newNameError = null; newQuantityError = null; newPriceError = null
+                    },
                     confirmButton = {
                         Button(onClick = {
+                            newNameError = null
+                            newQuantityError = null
+                            newPriceError = null
 
-                            nameError = null
-                            quantityError = null
-                            priceError = null
-
-                            val trimmedName = name.trim()
-                            val quantityValue = quantity.toDoubleOrNull()
-                            val priceValue = price.toDoubleOrNull()
-
+                            val trimmedName = newName.trim()
+                            val quantityValue = newQuantity.toDoubleOrNull()
+                            val priceValue = newPrice.toDoubleOrNull()
                             var isValid = true
 
                             if (trimmedName.isBlank()) {
-                                nameError = "Please enter a Name"
+                                newNameError = "Please enter a name"
                                 isValid = false
                             }
                             if (quantityValue == null || quantityValue <= 0.0) {
-                                quantityError = "Quantity cannot be 0"
+                                newQuantityError = "Quantity must be > 0"
                                 isValid = false
                             }
-                            if (priceValue == null || priceValue <= 0.0) {
-                                priceError = "Enter the new purchase price"
+                            if (priceValue == null || priceValue < 0.0) {
+                                newPriceError = "Enter the purchase price"
                                 isValid = false
                             }
 
@@ -709,93 +1034,80 @@ fun IngredientScreen(
                             scope.launch {
                                 val currentDate = (System.currentTimeMillis() / 1000).toInt()
 
-                                val existingIngredient = ingredients.find {
-                                    it.name.equals(trimmedName, ignoreCase = true)
-                                }
+                                val existingIngredient = ingredients
+                                    .find { it.ingredient.name.equals(trimmedName, ignoreCase = true) }
+                                    ?.ingredient
 
                                 val densityValue = when {
                                     existingIngredient != null -> existingIngredient.density
-                                    unit == "unit" -> 1.0  // density irrelevant for countable items
+                                    newUnit == "unit" -> 1.0
                                     else -> askGeminiForDensity(trimmedName)
                                 }
+
+                                val expirationDate = parseDateToUnix(newExpirationStr)
 
                                 viewModel.addIngredient(
                                     name = trimmedName,
                                     quantity = quantityValue!!,
                                     density = densityValue,
-                                    unit = unit,
+                                    unit = newUnit,
                                     price = priceValue!!,
                                     dateEntered = currentDate,
-                                    dateLastUpdated = currentDate
+                                    expirationDate = expirationDate
                                 )
 
-                                name = ""
-                                quantity = ""
-                                unit = "g"
-                                price = ""
+                                newName = ""; newQuantity = ""; newUnit = "g"; newPrice = ""
+                                newExpirationStr = ""
                                 showAddNew = false
                             }
-
-                        }) {
-                            Text("Add")
-                        }
+                        }) { Text("Add") }
                     },
-
                     dismissButton = {
-                        Button(onClick = { showAddNew = false }) {
-                            Text("Cancel")
-                        }
+                        Button(onClick = {
+                            showAddNew = false
+                            newName = ""; newQuantity = ""; newUnit = "g"; newPrice = ""
+                            newExpirationStr = ""
+                            newNameError = null; newQuantityError = null; newPriceError = null
+                        }) { Text("Cancel") }
                     },
-
                     title = { Text("Add Ingredient") },
-
                     text = {
                         Column {
-
                             ExposedDropdownMenuBox(
-                                expanded = expanded && matchingIngredients.isNotEmpty(),
-                                onExpandedChange = { expanded = it }
+                                expanded = dialogDropdownExpanded && matchingIngredients.isNotEmpty(),
+                                onExpandedChange = { dialogDropdownExpanded = it }
                             ) {
-
                                 OutlinedTextField(
-                                    value = name,
-                                    onValueChange = {
-                                        name = it
-                                        expanded = true
-                                    },
+                                    colors = darkTextFieldColors(),
+                                    value = newName,
+                                    onValueChange = { newName = it; dialogDropdownExpanded = true },
                                     label = { Text("Ingredient Name") },
-                                    isError = nameError != null,
+                                    isError = newNameError != null,
                                     modifier = Modifier
-                                        .menuAnchor(
-                                            type = ExposedDropdownMenuAnchorType.PrimaryEditable,
-                                            enabled = true
-                                        )
+                                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable, true)
                                         .fillMaxWidth(),
                                     trailingIcon = {
-                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded)
+                                        ExposedDropdownMenuDefaults.TrailingIcon(dialogDropdownExpanded)
                                     },
                                     supportingText = {
-                                        nameError?.let {
-                                            Text(
-                                                it,
-                                                color = MaterialTheme.colorScheme.error
-                                            )
+                                        newNameError?.let {
+                                            Text(it, color = MaterialTheme.colorScheme.error)
                                         }
                                     }
                                 )
-
                                 ExposedDropdownMenu(
-                                    expanded = expanded && matchingIngredients.isNotEmpty(),
-                                    onDismissRequest = { expanded = false }
+                                    containerColor = Color.White,
+                                    expanded = dialogDropdownExpanded && matchingIngredients.isNotEmpty(),
+                                    onDismissRequest = { dialogDropdownExpanded = false }
                                 ) {
-                                    matchingIngredients.forEach { ingredient ->
+                                    matchingIngredients.forEach { ingredientWithQty ->
                                         DropdownMenuItem(
-                                            text = { Text(ingredient.name) },
+                                            text = { Text(ingredientWithQty.ingredient.name, color = Color.Black) },
                                             onClick = {
-                                                name = ingredient.name
-                                                unit = ingredient.unit
-                                                price = ""
-                                                expanded = false
+                                                newName = ingredientWithQty.ingredient.name
+                                                newUnit = ingredientWithQty.ingredient.unit
+                                                newPrice = ""
+                                                dialogDropdownExpanded = false
                                             }
                                         )
                                     }
@@ -804,7 +1116,10 @@ fun IngredientScreen(
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            val unitOptions = listOf("unit", "g", "kg", "oz", "lb", "ml", "gal", "cup", "tbsp", "tsp", "floz")
+                            val unitOptions = listOf(
+                                "unit", "g", "kg", "oz", "lb",
+                                "ml", "gal", "cup", "tbsp", "tsp", "floz"
+                            )
                             var unitDropdownExpanded by remember { mutableStateOf(false) }
 
                             Row(
@@ -812,14 +1127,15 @@ fun IngredientScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 OutlinedTextField(
-                                    value = quantity,
-                                    onValueChange = { quantity = it },
+                                    colors = darkTextFieldColors(),
+                                    value = newQuantity,
+                                    onValueChange = { newQuantity = it; newQuantityError = null },
                                     label = { Text("Quantity") },
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    isError = quantityError != null,
+                                    isError = newQuantityError != null,
                                     modifier = Modifier.weight(1f),
                                     supportingText = {
-                                        quantityError?.let {
+                                        newQuantityError?.let {
                                             Text(it, color = MaterialTheme.colorScheme.error)
                                         }
                                     }
@@ -831,30 +1147,27 @@ fun IngredientScreen(
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     OutlinedTextField(
-                                        value = unit,
+                                        colors = darkTextFieldColors(),
+                                        value = newUnit,
                                         onValueChange = {},
                                         readOnly = true,
                                         label = { Text("Unit") },
-                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(unitDropdownExpanded) },
+                                        trailingIcon = {
+                                            ExposedDropdownMenuDefaults.TrailingIcon(unitDropdownExpanded)
+                                        },
                                         modifier = Modifier
-                                            .menuAnchor(
-                                                type = ExposedDropdownMenuAnchorType.PrimaryNotEditable,
-                                                enabled = true
-                                            )
+                                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true)
                                             .fillMaxWidth()
                                     )
-
                                     ExposedDropdownMenu(
+                                        containerColor = Color.White,
                                         expanded = unitDropdownExpanded,
                                         onDismissRequest = { unitDropdownExpanded = false }
                                     ) {
                                         unitOptions.forEach { option ->
                                             DropdownMenuItem(
-                                                text = { Text(option) },
-                                                onClick = {
-                                                    unit = option
-                                                    unitDropdownExpanded = false
-                                                }
+                                                text = { Text(option, color = Color.Black) },
+                                                onClick = { newUnit = option; unitDropdownExpanded = false }
                                             )
                                         }
                                     }
@@ -864,22 +1177,28 @@ fun IngredientScreen(
                             Spacer(modifier = Modifier.height(8.dp))
 
                             OutlinedTextField(
-                                value = price,
-                                onValueChange = { price = it },
-                                label = { Text("Price") },
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Number
-                                ),
-                                isError = priceError != null,
+                                colors = darkTextFieldColors(),
+                                value = newPrice,
+                                onValueChange = { newPrice = it; newPriceError = null },
+                                label = { Text("Price ($)") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                isError = newPriceError != null,
                                 modifier = Modifier.fillMaxWidth(),
                                 supportingText = {
-                                    priceError?.let {
-                                        Text(
-                                            it,
-                                            color = MaterialTheme.colorScheme.error
-                                        )
+                                    newPriceError?.let {
+                                        Text(it, color = MaterialTheme.colorScheme.error)
                                     }
                                 }
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            OutlinedTextField(
+                                colors = darkTextFieldColors(),
+                                value = newExpirationStr,
+                                onValueChange = { newExpirationStr = it },
+                                label = { Text("Expiration Date (YYYY-MM-DD, optional)") },
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
                     }
@@ -888,4 +1207,3 @@ fun IngredientScreen(
         }
     }
 }
-
