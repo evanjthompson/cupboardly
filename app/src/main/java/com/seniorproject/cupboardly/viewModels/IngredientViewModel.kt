@@ -49,7 +49,7 @@ class IngredientViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     // ----------------------------
-    // Ingredient Definition CRUD
+    // Ingredient Definition
     // ----------------------------
     fun addIngredient(
         name: String,
@@ -61,10 +61,10 @@ class IngredientViewModel(application: Application) : AndroidViewModel(applicati
         expirationDate: Int? = null
     ) {
         viewModelScope.launch {
-            // 1. Add or get ingredient definition
+            // Add or get ingredient definition
             val ingredientId = ingredientWrapper.addIngredientDefinition(name, density, unit)
 
-            // 2. Add batch for inventory
+            // Add batch for inventory
             ingredientWrapper.addBatch(
                 ingredientId,
                 ingredientWrapper.convertToGrams(quantity, unit, density),
@@ -73,7 +73,7 @@ class IngredientViewModel(application: Application) : AndroidViewModel(applicati
                 dateEntered
             )
 
-            // 3. Refresh StateFlow
+            // Refresh StateFlow
             loadIngredients()
         }
     }
@@ -101,7 +101,7 @@ class IngredientViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     // ----------------------------
-    // Batch CRUD
+    // Batch
     // ----------------------------
     fun addBatch(
         ingredientId: Long,
