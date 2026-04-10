@@ -150,12 +150,11 @@ fun RecipeScreen(
     var loadingMessage by remember { mutableStateOf("") }
 
     // prefill values for when adding a recipe via camera scan
-    var prefillName       by remember { mutableStateOf("") }
+    var prefillName by remember { mutableStateOf("") }
     var prefillInstructions by remember { mutableStateOf("") }
     val prefillTempIngredients = remember { mutableStateListOf<TempIngredient>() }
     val prefillSelectedIngredients = remember { mutableStateMapOf<Long, String>() }
-    val prefillSelectedUnits       = remember { mutableStateMapOf<Long, String>() }
-
+    val prefillSelectedUnits = remember { mutableStateMapOf<Long, String>() }
 
     var showAddDialog by remember { mutableStateOf(false) }
 
@@ -458,107 +457,163 @@ fun RecipeScreen(
                 },
                 title = { Text("Add New Recipe") },
                 text = {
-                    val scrollState = rememberScrollState()
+                    // Wrap in a Box so the loading overlay can sit on top of the dialog content
+                    Box {
+                        val scrollState = rememberScrollState()
 
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 500.dp)
-                            .verticalScroll(scrollState),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = name,
-                            onValueChange = { name = it; nameError = false },
-                            label = { Text("Recipe Name") },
-                            isError = nameError
-                        )
-
-                        OutlinedTextField(
-                            value = instructions,
-                            onValueChange = { instructions = it },
-                            label = { Text("Instructions") }
-                        )
-
-                        Divider()
-
-                        Text("Add New Ingredient", fontWeight = FontWeight.Bold)
-
-                        Row {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 500.dp)
+                                .verticalScroll(scrollState),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
                             OutlinedTextField(
-                                value = newIngredientName,
-                                onValueChange = { newIngredientName = it; ingredientError = null },
-                                label = { Text("Ingredient Name") },
-                                modifier = Modifier.weight(1f)
+                                value = name,
+                                onValueChange = { name = it; nameError = false },
+                                label = { Text("Recipe Name") },
+                                isError = nameError
                             )
 
-                            Spacer(modifier = Modifier.width(8.dp))
+                            OutlinedTextField(
+                                value = instructions,
+                                onValueChange = { instructions = it },
+                                label = { Text("Instructions") }
+                            )
 
-                            Button(onClick = {
-                                val trimmedName = newIngredientName.trim()
-                                if (trimmedName.isBlank()) return@Button
+                            Divider()
 
-                                coroutineScope.launch {
-                                    val existsInDb = ingredientViewModel.getIngredientByName(trimmedName)
-                                    val existsInTemp = tempIngredients.any {
-                                        it.name.equals(trimmedName, ignoreCase = true)
+                            Text("Add New Ingredient", fontWeight = FontWeight.Bold)
+
+                            Row {
+                                OutlinedTextField(
+                                    value = newIngredientName,
+                                    onValueChange = { newIngredientName = it; ingredientError = null },
+                                    label = { Text("Ingredient Name") },
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                Button(onClick = {
+                                    val trimmedName = newIngredientName.trim()
+                                    if (trimmedName.isBlank()) return@Button
+
+                                    coroutineScope.launch {
+                                        val existsInDb = ingredientViewModel.getIngredientByName(trimmedName)
+                                        val existsInTemp = tempIngredients.any {
+                                            it.name.equals(trimmedName, ignoreCase = true)
+                                        }
+
+                                        if (existsInDb != null || existsInTemp) {
+                                            ingredientError = "Ingredient already exists"
+                                            return@launch
+                                        }
+
+                                        ingredientError = null
+                                        tempIngredients.add(TempIngredient(trimmedName))
+                                        newIngredientName = ""
                                     }
-
-                                    if (existsInDb != null || existsInTemp) {
-                                        ingredientError = "Ingredient already exists"
-                                        return@launch
-                                    }
-
-                                    ingredientError = null
-                                    tempIngredients.add(TempIngredient(trimmedName))
-                                    newIngredientName = ""
+                                }) {
+                                    Text("Add")
                                 }
-                            }) {
-                                Text("Add")
                             }
-                        }
 
-                        ingredientError?.let {
-                            Text(it, color = Color.Red, fontSize = 14.sp)
-                        }
+                            ingredientError?.let {
+                                Text(it, color = Color.Red, fontSize = 14.sp)
+                            }
 
-                        Divider()
+                            Divider()
 
-                        Text("Select Ingredients", fontWeight = FontWeight.Bold)
+                            Text("Select Ingredients", fontWeight = FontWeight.Bold)
 
-                        LazyColumn(
-                            modifier = Modifier
-                                .height(250.dp)
-                                .fillMaxWidth()
-                        ) {
-                            // Existing ingredients
-                            items(allIngredients, key = { it.ingredient.id }) { ingredientWithQty ->
-                                val ingredient = ingredientWithQty.ingredient
-                                val isSelected = selectedIngredients.containsKey(ingredient.id)
-                                var unitDropdownExpanded by remember { mutableStateOf(false) }
+                            LazyColumn(
+                                modifier = Modifier
+                                    .height(250.dp)
+                                    .fillMaxWidth()
+                            ) {
+                                // Existing ingredients
+                                items(allIngredients, key = { it.ingredient.id }) { ingredientWithQty ->
+                                    val ingredient = ingredientWithQty.ingredient
+                                    val isSelected = selectedIngredients.containsKey(ingredient.id)
+                                    var unitDropdownExpanded by remember { mutableStateOf(false) }
 
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Checkbox(
-                                        checked = isSelected,
-                                        onCheckedChange = { checked ->
-                                            if (checked) {
-                                                selectedIngredients[ingredient.id] = "1.0"
-                                                selectedUnits[ingredient.id] = ingredient.unit.ifBlank { "g" }
-                                            } else {
-                                                selectedIngredients.remove(ingredient.id)
-                                                selectedUnits.remove(ingredient.id)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Checkbox(
+                                            checked = isSelected,
+                                            onCheckedChange = { checked ->
+                                                if (checked) {
+                                                    selectedIngredients[ingredient.id] = "1.0"
+                                                    selectedUnits[ingredient.id] = ingredient.unit.ifBlank { "g" }
+                                                } else {
+                                                    selectedIngredients.remove(ingredient.id)
+                                                    selectedUnits.remove(ingredient.id)
+                                                }
+                                            }
+                                        )
+                                        Text(ingredient.name, modifier = Modifier.weight(1f))
+
+                                        if (isSelected) {
+                                            OutlinedTextField(
+                                                value = selectedIngredients[ingredient.id] ?: "",
+                                                onValueChange = { selectedIngredients[ingredient.id] = it },
+                                                label = { Text("Qty") },
+                                                modifier = Modifier.width(70.dp),
+                                                singleLine = true
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            ExposedDropdownMenuBox(
+                                                expanded = unitDropdownExpanded,
+                                                onExpandedChange = { unitDropdownExpanded = it },
+                                                modifier = Modifier.width(100.dp)
+                                            ) {
+                                                OutlinedTextField(
+                                                    value = selectedUnits[ingredient.id] ?: ingredient.unit.ifBlank { "g" },
+                                                    onValueChange = {},
+                                                    readOnly = true,
+                                                    label = { Text("Unit") },
+                                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(unitDropdownExpanded) },
+                                                    modifier = Modifier
+                                                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true)
+                                                        .fillMaxWidth(),
+                                                    singleLine = true
+                                                )
+                                                ExposedDropdownMenu(
+                                                    expanded = unitDropdownExpanded,
+                                                    onDismissRequest = { unitDropdownExpanded = false }
+                                                ) {
+                                                    unitOptions.forEach { option ->
+                                                        DropdownMenuItem(
+                                                            text = { Text(option) },
+                                                            onClick = {
+                                                                selectedUnits[ingredient.id] = option
+                                                                unitDropdownExpanded = false
+                                                            }
+                                                        )
+                                                    }
+                                                }
                                             }
                                         }
-                                    )
-                                    Text(ingredient.name, modifier = Modifier.weight(1f))
+                                    }
+                                }
 
-                                    if (isSelected) {
+                                // New ingredients — appear right below existing ones
+                                items(tempIngredients, key = { "temp_${it.name}" }) { temp ->
+                                    var unitDropdownExpanded by remember { mutableStateOf(false) }
+
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        // Spacer to align with the checkbox above
+                                        Spacer(modifier = Modifier.width(48.dp))
+                                        Text("[NEW] " + temp.name, modifier = Modifier.weight(1f))
                                         OutlinedTextField(
-                                            value = selectedIngredients[ingredient.id] ?: "",
-                                            onValueChange = { selectedIngredients[ingredient.id] = it },
+                                            value = temp.quantity,
+                                            onValueChange = { temp.quantity = it },
                                             label = { Text("Qty") },
                                             modifier = Modifier.width(70.dp),
                                             singleLine = true
@@ -570,7 +625,7 @@ fun RecipeScreen(
                                             modifier = Modifier.width(100.dp)
                                         ) {
                                             OutlinedTextField(
-                                                value = selectedUnits[ingredient.id] ?: ingredient.unit.ifBlank { "g" },
+                                                value = temp.unit,
                                                 onValueChange = {},
                                                 readOnly = true,
                                                 label = { Text("Unit") },
@@ -587,151 +642,128 @@ fun RecipeScreen(
                                                 unitOptions.forEach { option ->
                                                     DropdownMenuItem(
                                                         text = { Text(option) },
-                                                        onClick = {
-                                                            selectedUnits[ingredient.id] = option
-                                                            unitDropdownExpanded = false
-                                                        }
+                                                        onClick = { temp.unit = option; unitDropdownExpanded = false }
                                                     )
                                                 }
                                             }
                                         }
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        IconButton(onClick = { tempIngredients.remove(temp) }) {
+                                            Text("X", color = Color.Red, fontSize = 16.sp)
+                                        }
                                     }
                                 }
                             }
+                        }
 
-                            // New ingredients — appear right below existing ones
-                            items(tempIngredients, key = { "temp_${it.name}" }) { temp ->
-                                var unitDropdownExpanded by remember { mutableStateOf(false) }
-
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.fillMaxWidth()
+                        // Overlay inside the dialog, on top of the content
+                        if (isLoading) {
+                            Box(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .clickable(enabled = false) {} // dont allow any taps during loading
+                                    .background(Color.Black.copy(alpha = 0.5f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    // Spacer to align with the checkbox above
-                                    Spacer(modifier = Modifier.width(48.dp))
-                                    Text("[NEW] " + temp.name, modifier = Modifier.weight(1f))
-                                    OutlinedTextField(
-                                        value = temp.quantity,
-                                        onValueChange = { temp.quantity = it },
-                                        label = { Text("Qty") },
-                                        modifier = Modifier.width(70.dp),
-                                        singleLine = true
+                                    CircularProgressIndicator(color = darkBlue)
+                                    Text(
+                                        loadingMessage,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Color.White
                                     )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    ExposedDropdownMenuBox(
-                                        expanded = unitDropdownExpanded,
-                                        onExpandedChange = { unitDropdownExpanded = it },
-                                        modifier = Modifier.width(100.dp)
-                                    ) {
-                                        OutlinedTextField(
-                                            value = temp.unit,
-                                            onValueChange = {},
-                                            readOnly = true,
-                                            label = { Text("Unit") },
-                                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(unitDropdownExpanded) },
-                                            modifier = Modifier
-                                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true)
-                                                .fillMaxWidth(),
-                                            singleLine = true
-                                        )
-                                        ExposedDropdownMenu(
-                                            expanded = unitDropdownExpanded,
-                                            onDismissRequest = { unitDropdownExpanded = false }
-                                        ) {
-                                            unitOptions.forEach { option ->
-                                                DropdownMenuItem(
-                                                    text = { Text(option) },
-                                                    onClick = { temp.unit = option; unitDropdownExpanded = false }
-                                                )
-                                            }
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    IconButton(onClick = { tempIngredients.remove(temp) }) {
-                                        Text("X", color = Color.Red, fontSize = 16.sp)
-                                    }
                                 }
                             }
                         }
                     }
                 },
                 confirmButton = {
-                    Button(onClick = {
-                        if (name.isBlank()) { nameError = true; return@Button }
+                    Button(
+                        onClick = {
+                            if (name.isBlank()) { nameError = true; return@Button }
 
-                        coroutineScope.launch {
-                            // set the loading message
-                            isLoading = true
-                            loadingMessage = "Adding recipe..."
-                            val currentDate = (System.currentTimeMillis() / 1000).toInt()
+                            coroutineScope.launch {
+                                // set the loading message
+                                isLoading = true
+                                loadingMessage = "Adding recipe..."
+                                val currentDate = (System.currentTimeMillis() / 1000).toInt()
 
-                            val recipeId = recipeViewModel.addRecipeAndReturnId(
-                                name.trim(), instructions.trim(), currentDate
-                            )
-
-                            // Create new ingredients and link them using the returned ID
-                            tempIngredients.forEach { temp ->
-                                val existing = ingredientViewModel.getIngredientByName(temp.name)
-
-                                val targetId: Long
-                                val targetDensity: Double?
-
-                                if (existing != null) {
-                                    // Already in DB — just link it, don't create a duplicate
-                                    targetId = existing.id
-                                    targetDensity = existing.density
-                                } else {
-                                    // actually new — create it
-                                    val densityValue = askGeminiForDensity(temp.name)
-                                    targetId = ingredientViewModel.addIngredientAndReturnId(
-                                        name = temp.name,
-                                        unit = temp.unit,
-                                        density = densityValue
-                                    )
-                                    targetDensity = densityValue
-                                }
-
-                                val qty = temp.quantity.toDoubleOrNull() ?: 0.0
-                                val grams = ingredientViewModel.convertToGrams(qty, temp.unit, targetDensity)
-
-                                recipeViewModel.addIngredientToRecipe(
-                                    recipeId,
-                                    targetId,
-                                    grams,
-                                    temp.unit
+                                val recipeId = recipeViewModel.addRecipeAndReturnId(
+                                    name.trim(), instructions.trim(), currentDate
                                 )
-                            }
 
-                            // Link existing selected ingredients
-                            selectedIngredients.forEach { (id, qtyString) ->
-                                val qty = qtyString.toDoubleOrNull() ?: 0.0
-                                if (qty > 0) {
-                                    val ingredientEntity = allIngredients
-                                        .find { it.ingredient.id == id }?.ingredient
+                                // Create new ingredients and link them using the returned ID
+                                tempIngredients.forEach { temp ->
+                                    val existing = ingredientViewModel.getIngredientByName(temp.name)
 
-                                    val selectedUnit = selectedUnits[id]
-                                        ?: ingredientEntity?.unit ?: "g"
+                                    val targetId: Long
+                                    val targetDensity: Double?
 
-                                    val gramsToStore = ingredientViewModel.convertToGrams(
-                                        qty, selectedUnit, ingredientEntity?.density
-                                    )
+                                    if (existing != null) {
+                                        // Already in DB — just link it, don't create a duplicate
+                                        targetId = existing.id
+                                        targetDensity = existing.density
+                                    } else {
+                                        // Actually new — create it
+                                        val densityValue = askGeminiForDensity(temp.name)
+                                        targetId = ingredientViewModel.addIngredientAndReturnId(
+                                            name = temp.name,
+                                            unit = temp.unit,
+                                            density = densityValue
+                                        )
+                                        targetDensity = densityValue
+                                    }
+
+                                    val qty = temp.quantity.toDoubleOrNull() ?: 0.0
+                                    val grams = ingredientViewModel.convertToGrams(qty, temp.unit, targetDensity)
 
                                     recipeViewModel.addIngredientToRecipe(
-                                        recipeId, id, gramsToStore, selectedUnit
+                                        recipeId,
+                                        targetId,
+                                        grams,
+                                        temp.unit
                                     )
                                 }
-                            }
 
-                            recipeViewModel.refresh()
-                            showAddDialog = false
-                            // no longer loading
-                            isLoading = false
-                            loadingMessage = ""
-                        }
-                    }) { Text("Save") }
+                                // Link existing selected ingredients
+                                selectedIngredients.forEach { (id, qtyString) ->
+                                    val qty = qtyString.toDoubleOrNull() ?: 0.0
+                                    if (qty > 0) {
+                                        val ingredientEntity = allIngredients
+                                            .find { it.ingredient.id == id }?.ingredient
+
+                                        val selectedUnit = selectedUnits[id]
+                                            ?: ingredientEntity?.unit ?: "g"
+
+                                        val gramsToStore = ingredientViewModel.convertToGrams(
+                                            qty, selectedUnit, ingredientEntity?.density
+                                        )
+
+                                        recipeViewModel.addIngredientToRecipe(
+                                            recipeId, id, gramsToStore, selectedUnit
+                                        )
+                                    }
+                                }
+
+                                recipeViewModel.refresh()
+                                showAddDialog = false
+                                // no longer loading
+                                isLoading = false
+                                loadingMessage = ""
+                            }
+                        },
+                        enabled = !isLoading  // disable button while saving
+                    ) { Text("Save") }
                 },
                 dismissButton = {
-                    Button(onClick = { showAddDialog = false }) { Text("Cancel") }
+                    Button(
+                        onClick = { showAddDialog = false },
+                        enabled = !isLoading  // prevent dismissal while saving
+                    ) { Text("Cancel") }
                 }
             )
         }
@@ -922,11 +954,12 @@ fun RecipeScreen(
         }
 
         // ---------------- LOADING OVERLAY ----------------
-        if (isLoading) {
+        // Covers the full screen for the photo analysis phase (before the dialog opens)
+        if (isLoading && !showAddDialog) {
             Box(
                 modifier = Modifier
                     .matchParentSize()
-                    .clickable(enabled = false) {}  // dont allow any taps during loading
+                    .clickable(enabled = false) {} // dont allow any taps during loading
                     .background(Color.Black.copy(alpha = 0.5f)),
                 contentAlignment = Alignment.Center
             ) {
