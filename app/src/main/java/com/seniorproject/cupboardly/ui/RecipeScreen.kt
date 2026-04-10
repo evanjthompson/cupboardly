@@ -361,6 +361,17 @@ fun RecipeScreen(
 
                                     Button(
                                         onClick = {
+                                            recipeToDelete = recipe.id
+                                            showDeleteDialog = true
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("Delete")
+                                    }
+
+                                    Button(
+                                        onClick = {
                                             editingRecipeId = recipe.id
                                             showEditDialog = true
                                         },
@@ -1012,19 +1023,6 @@ fun RecipeScreen(
                                 }
                             }
 
-                            Divider()
-
-                            // Delete button lives inside the edit dialog
-                            Button(
-                                onClick = {
-                                    recipeToDelete = recipe.id
-                                    showDeleteDialog = true
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Delete Recipe")
-                            }
                         }
                     },
                     confirmButton = {
