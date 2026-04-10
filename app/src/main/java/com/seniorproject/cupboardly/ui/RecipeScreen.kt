@@ -531,9 +531,9 @@ fun RecipeScreen(
                                 .height(250.dp)
                                 .fillMaxWidth()
                         ) {
+                            // Existing ingredients
                             items(allIngredients, key = { it.ingredient.id }) { ingredientWithQty ->
                                 val ingredient = ingredientWithQty.ingredient
-
                                 val isSelected = selectedIngredients.containsKey(ingredient.id)
                                 var unitDropdownExpanded by remember { mutableStateOf(false) }
 
@@ -546,51 +546,37 @@ fun RecipeScreen(
                                         onCheckedChange = { checked ->
                                             if (checked) {
                                                 selectedIngredients[ingredient.id] = "1.0"
-                                                selectedUnits[ingredient.id] =
-                                                    ingredient.unit.ifBlank { "g" }
+                                                selectedUnits[ingredient.id] = ingredient.unit.ifBlank { "g" }
                                             } else {
                                                 selectedIngredients.remove(ingredient.id)
                                                 selectedUnits.remove(ingredient.id)
                                             }
                                         }
                                     )
-
                                     Text(ingredient.name, modifier = Modifier.weight(1f))
 
                                     if (isSelected) {
                                         OutlinedTextField(
                                             value = selectedIngredients[ingredient.id] ?: "",
-                                            onValueChange = {
-                                                selectedIngredients[ingredient.id] = it
-                                            },
+                                            onValueChange = { selectedIngredients[ingredient.id] = it },
                                             label = { Text("Qty") },
                                             modifier = Modifier.width(70.dp),
                                             singleLine = true
                                         )
-
                                         Spacer(modifier = Modifier.width(4.dp))
-
                                         ExposedDropdownMenuBox(
                                             expanded = unitDropdownExpanded,
                                             onExpandedChange = { unitDropdownExpanded = it },
                                             modifier = Modifier.width(100.dp)
                                         ) {
                                             OutlinedTextField(
-                                                value = selectedUnits[ingredient.id]
-                                                    ?: ingredient.unit.ifBlank { "g" },
+                                                value = selectedUnits[ingredient.id] ?: ingredient.unit.ifBlank { "g" },
                                                 onValueChange = {},
                                                 readOnly = true,
                                                 label = { Text("Unit") },
-                                                trailingIcon = {
-                                                    ExposedDropdownMenuDefaults.TrailingIcon(
-                                                        unitDropdownExpanded
-                                                    )
-                                                },
+                                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(unitDropdownExpanded) },
                                                 modifier = Modifier
-                                                    .menuAnchor(
-                                                        type = ExposedDropdownMenuAnchorType.PrimaryNotEditable,
-                                                        enabled = true
-                                                    )
+                                                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true)
                                                     .fillMaxWidth(),
                                                 singleLine = true
                                             )
@@ -612,23 +598,18 @@ fun RecipeScreen(
                                     }
                                 }
                             }
-                        }
 
-                        // ---------------- NEW INGREDIENTS SECTION ----------------
-
-                        if (tempIngredients.isNotEmpty()) {
-                            Divider()
-                            Text("New Ingredients", fontWeight = FontWeight.Bold)
-
-                            tempIngredients.forEach { temp ->
+                            // New ingredients — appear right below existing ones
+                            items(tempIngredients, key = { "temp_${it.name}" }) { temp ->
                                 var unitDropdownExpanded by remember { mutableStateOf(false) }
 
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Text(temp.name, modifier = Modifier.weight(1f))
-
+                                    // Spacer to align with the checkbox above
+                                    Spacer(modifier = Modifier.width(48.dp))
+                                    Text("[NEW] " + temp.name, modifier = Modifier.weight(1f))
                                     OutlinedTextField(
                                         value = temp.quantity,
                                         onValueChange = { temp.quantity = it },
@@ -636,9 +617,7 @@ fun RecipeScreen(
                                         modifier = Modifier.width(70.dp),
                                         singleLine = true
                                     )
-
                                     Spacer(modifier = Modifier.width(4.dp))
-
                                     ExposedDropdownMenuBox(
                                         expanded = unitDropdownExpanded,
                                         onExpandedChange = { unitDropdownExpanded = it },
@@ -649,16 +628,9 @@ fun RecipeScreen(
                                             onValueChange = {},
                                             readOnly = true,
                                             label = { Text("Unit") },
-                                            trailingIcon = {
-                                                ExposedDropdownMenuDefaults.TrailingIcon(
-                                                    unitDropdownExpanded
-                                                )
-                                            },
+                                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(unitDropdownExpanded) },
                                             modifier = Modifier
-                                                .menuAnchor(
-                                                    type = ExposedDropdownMenuAnchorType.PrimaryNotEditable,
-                                                    enabled = true
-                                                )
+                                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true)
                                                 .fillMaxWidth(),
                                             singleLine = true
                                         )
@@ -669,13 +641,14 @@ fun RecipeScreen(
                                             unitOptions.forEach { option ->
                                                 DropdownMenuItem(
                                                     text = { Text(option) },
-                                                    onClick = {
-                                                        temp.unit = option
-                                                        unitDropdownExpanded = false
-                                                    }
+                                                    onClick = { temp.unit = option; unitDropdownExpanded = false }
                                                 )
                                             }
                                         }
+                                    }
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    IconButton(onClick = { tempIngredients.remove(temp) }) {
+                                        Text("X", color = Color.Red, fontSize = 16.sp)
                                     }
                                 }
                             }
