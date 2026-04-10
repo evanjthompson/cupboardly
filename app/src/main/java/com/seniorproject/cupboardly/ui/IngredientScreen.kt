@@ -246,6 +246,9 @@ fun IngredientScreen(
                         var addMoreQuantityError by remember { mutableStateOf<String?>(null) }
                         var addMorePriceError by remember { mutableStateOf<String?>(null) }
 
+                        // Delete guard message
+                        var deleteBlockedMessage by remember { mutableStateOf<String?>(null) }
+
                         // Derived display quantity (total in current display unit)
                         val displayQty =
                             remember(totalQuantityGrams, ingredient.density, displayUnit) {
@@ -271,6 +274,7 @@ fun IngredientScreen(
                                         isEditing = false
                                         isAddingMore = false
                                         editingBatchId = null
+                                        deleteBlockedMessage = null
                                     }
                                 }
                         ) {
@@ -810,7 +814,11 @@ fun IngredientScreen(
                                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                                             ) {
                                                 Button(
-                                                    onClick = { isEditing = false; editingBatchId = null },
+                                                    onClick = {
+                                                        isEditing = false
+                                                        editingBatchId = null
+                                                        deleteBlockedMessage = null
+                                                    },
                                                     colors = ButtonDefaults.buttonColors(containerColor = gold),
                                                     modifier = Modifier.weight(1f)
                                                 ) { Text("Cancel") }
@@ -839,17 +847,27 @@ fun IngredientScreen(
                                                             )
                                                             isEditing = false
                                                             editingBatchId = null
+                                                            deleteBlockedMessage = null
                                                         }
                                                     },
                                                     colors = ButtonDefaults.buttonColors(containerColor = gold),
                                                     modifier = Modifier.weight(1f)
                                                 ) { Text("Confirm") }
 
+                                                // Delete — blocked if ingredient is used by a recipe
                                                 Button(
                                                     onClick = {
-                                                        viewModel.deleteIngredient(ingredient)
-                                                        isEditing = false
-                                                        editingBatchId = null
+                                                        scope.launch {
+                                                            val inUse = viewModel.isUsedByRecipe(ingredient.id)
+                                                            if (inUse) {
+                                                                deleteBlockedMessage = "In use by a recipe"
+                                                            } else {
+                                                                viewModel.deleteIngredient(ingredient)
+                                                                isEditing = false
+                                                                editingBatchId = null
+                                                                deleteBlockedMessage = null
+                                                            }
+                                                        }
                                                     },
                                                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                                                     modifier = Modifier.weight(0.75f)
@@ -861,6 +879,16 @@ fun IngredientScreen(
                                                         modifier = Modifier.fillMaxWidth()
                                                     )
                                                 }
+                                            }
+
+                                            // Show blocked message below the button row if needed
+                                            deleteBlockedMessage?.let { msg ->
+                                                Text(
+                                                    text = msg,
+                                                    color = Color.Red,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    modifier = Modifier.padding(top = 4.dp)
+                                                )
                                             }
                                         }
 
@@ -923,6 +951,7 @@ fun IngredientScreen(
 
                                             Spacer(modifier = Modifier.height(12.dp))
 
+                                            // Action buttons: Add More | Edit | Reset
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
                                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -947,10 +976,19 @@ fun IngredientScreen(
                                                         editName = ingredient.name
                                                         editNameError = null
                                                         editingBatchId = null
+                                                        deleteBlockedMessage = null
                                                     },
                                                     colors = ButtonDefaults.buttonColors(containerColor = gold),
                                                     modifier = Modifier.weight(1f)
                                                 ) { Text("Edit") }
+
+                                                Button(
+                                                    onClick = {
+                                                        viewModel.resetIngredient(ingredient.id)
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF888888)),
+                                                    modifier = Modifier.weight(1f)
+                                                ) { Text("Reset") }
                                             }
                                         }
                                     }

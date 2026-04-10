@@ -10,6 +10,7 @@ class Ingredient(context: Context) {
     private val db = AppDatabase.getDatabase(context)
     private val ingredientDao = db.ingredientDao()
     private val batchDao = db.ingredientBatchDao()
+    private val recipeIngredientDao = db.recipeIngredientDao()
 
     // -------------------------------
     // Ingredient Definition
@@ -62,6 +63,14 @@ class Ingredient(context: Context) {
     }
 
     // -------------------------------
+    // Recipe relationship checks
+    // -------------------------------
+
+    suspend fun isUsedByRecipe(ingredientId: Long): Boolean {
+        return recipeIngredientDao.getRecipesForIngredient(ingredientId).isNotEmpty()
+    }
+
+    // -------------------------------
     // Ingredient Batches
     // -------------------------------
 
@@ -96,6 +105,13 @@ class Ingredient(context: Context) {
 
     suspend fun getTotalQuantity(ingredientId: Long): Double {
         return batchDao.getTotalQuantity(ingredientId) ?: 0.0
+    }
+
+    suspend fun resetBatches(ingredientId: Long) {
+        val batches = batchDao.getBatchesForIngredient(ingredientId)
+        batches.forEach { batch ->
+            batchDao.update(batch.copy(quantity = 0.0, price = 0.0))
+        }
     }
 
     // -------------------------------

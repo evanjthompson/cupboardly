@@ -111,6 +111,14 @@ class IngredientViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     // ----------------------------
+    // Recipe relationship checks
+    // ----------------------------
+
+    suspend fun isUsedByRecipe(ingredientId: Long): Boolean {
+        return ingredientWrapper.isUsedByRecipe(ingredientId)
+    }
+
+    // ----------------------------
     // Batch
     // ----------------------------
     fun addBatch(
@@ -142,6 +150,13 @@ class IngredientViewModel(application: Application) : AndroidViewModel(applicati
     fun deleteBatch(batch: IngredientBatchEntity) {
         viewModelScope.launch {
             ingredientWrapper.deleteBatch(batch)
+            loadIngredients()
+        }
+    }
+
+    fun resetIngredient(ingredientId: Long) {
+        viewModelScope.launch {
+            ingredientWrapper.resetBatches(ingredientId)
             loadIngredients()
         }
     }
