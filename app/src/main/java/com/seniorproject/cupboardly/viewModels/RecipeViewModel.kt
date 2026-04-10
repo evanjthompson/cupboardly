@@ -1,8 +1,10 @@
 package com.seniorproject.cupboardly.viewModels
 
 import android.app.Application
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.seniorproject.cupboardly.classes.AiRecipe
 import com.seniorproject.cupboardly.classes.Recipe
 import com.seniorproject.cupboardly.room.entity.RecipeEntity
 import com.seniorproject.cupboardly.room.entity.RecipeIngredientEntity
@@ -10,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.State
 
 class RecipeViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -71,5 +74,12 @@ class RecipeViewModel(application: Application) : AndroidViewModel(application) 
         dateCreated: Int
     ): Long {
         return recipeWrapper.addRecipe(name, instructions, dateCreated)
+    }
+
+    private val _previewRecipe = mutableStateOf<AiRecipe?>(null)
+    val previewRecipe: State<AiRecipe?> = _previewRecipe
+
+    fun setPreviewRecipe(recipe: AiRecipe?) {
+        _previewRecipe.value = recipe
     }
 }

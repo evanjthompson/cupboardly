@@ -78,6 +78,16 @@ class IngredientViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    suspend fun addIngredientAndReturnId(
+        name: String,
+        unit: String,
+        density: Double,
+    ): Long {
+        val id = ingredientWrapper.addIngredientDefinition(name, density, unit)
+        loadIngredients()
+        return id
+    }
+
     fun updateIngredient(updatedIngredient: IngredientEntity) {
         viewModelScope.launch {
             ingredientWrapper.updateIngredientDefinition(updatedIngredient)
