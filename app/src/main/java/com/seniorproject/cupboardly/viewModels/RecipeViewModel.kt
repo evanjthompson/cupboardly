@@ -43,13 +43,25 @@ class RecipeViewModel(application: Application) : AndroidViewModel(application) 
     // Delete a recipe AND all its ingredients in the join table
     fun deleteRecipeWithIngredients(recipeId: Long) {
         viewModelScope.launch {
-            // Delete all recipe_ingredient_table entries first
             recipeWrapper.deleteIngredientsForRecipe(recipeId)
-            // Then delete the recipe itself
             recipeWrapper.deleteById(recipeId)
-            // Refresh the recipes list
             refresh()
         }
+    }
+
+    // Update a recipe's name and instructions
+    suspend fun updateRecipe(recipe: RecipeEntity) {
+        recipeWrapper.updateRecipe(recipe)
+        refresh()
+    }
+
+    // Replace all ingredients for a recipe (delete old ones, insert new ones)
+    suspend fun replaceIngredientsForRecipe(
+        recipeId: Long,
+        ingredients: List<RecipeIngredientEntity>
+    ) {
+        recipeWrapper.deleteIngredientsForRecipe(recipeId)
+        ingredients.forEach { recipeWrapper.addIngredientToRecipe(it.recipeId, it.ingredientId, it.quantityUsed, it.unitUsed) }
     }
 
     // Get all ingredients for a specific recipe

@@ -50,6 +50,7 @@ import androidx.compose.runtime.Composable
 import com.seniorproject.cupboardly.classes.AiRecipe
 import com.seniorproject.cupboardly.classes.askGeminiForRecipeParse
 import com.seniorproject.cupboardly.room.entity.IngredientBatchEntity
+import com.seniorproject.cupboardly.room.entity.RecipeIngredientEntity
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -158,6 +159,10 @@ fun RecipeScreen(
 
     var showAddDialog by remember { mutableStateOf(false) }
 
+    // Edit dialog state
+    var showEditDialog by remember { mutableStateOf(false) }
+    var editingRecipeId by remember { mutableStateOf<Long?>(null) }
+
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
@@ -185,13 +190,11 @@ fun RecipeScreen(
                                 it.ingredient.name.equals(aiIngredient.name, ignoreCase = true)
                             }
                             if (match != null) {
-                                // Already exists = pre-check the checkbox
                                 prefillSelectedIngredients[match.ingredient.id] =
                                     aiIngredient.quantity?.toString() ?: "1.0"
                                 prefillSelectedUnits[match.ingredient.id] =
                                     aiIngredient.unit ?: match.ingredient.unit.ifBlank { "g" }
                             } else {
-                                // Doesn't exist = goes into New Ingredients
                                 prefillTempIngredients.add(
                                     TempIngredient(
                                         name     = aiIngredient.name,
@@ -328,7 +331,7 @@ fun RecipeScreen(
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
 
-                            Text(recipe.name)
+                            Text(recipe.name, fontWeight = FontWeight.SemiBold)
 
                             if (expanded) {
                                 Spacer(modifier = Modifier.height(8.dp))
@@ -339,25 +342,33 @@ fun RecipeScreen(
 
                                 Spacer(modifier = Modifier.height(8.dp))
 
-                                Button(onClick = {
-                                    activeRecipe = recipe.id
-                                    startError = null
-                                    startDialogIngredientInfo = emptyList()
-                                    showStartDialog = true
-                                }) {
-                                    Text("Start")
-                                }
-
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                Button(
-                                    onClick = {
-                                        recipeToDelete = recipe.id
-                                        showDeleteDialog = true
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Text("Delete")
+                                    Button(
+                                        onClick = {
+                                            activeRecipe = recipe.id
+                                            startError = null
+                                            startDialogIngredientInfo = emptyList()
+                                            showStartDialog = true
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = darkBlue),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("Start")
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            editingRecipeId = recipe.id
+                                            showEditDialog = true
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = darkBlue),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("Edit")
+                                    }
                                 }
                             }
                         }
@@ -448,7 +459,6 @@ fun RecipeScreen(
             AlertDialog(
                 onDismissRequest = {
                     showAddDialog = false
-                    // Clear prefill so a manually-opened dialog starts blank
                     prefillName = ""
                     prefillInstructions = ""
                     prefillTempIngredients.clear()
@@ -457,7 +467,6 @@ fun RecipeScreen(
                 },
                 title = { Text("Add New Recipe") },
                 text = {
-                    // Wrap in a Box so the loading overlay can sit on top of the dialog content
                     Box {
                         val scrollState = rememberScrollState()
 
@@ -532,7 +541,6 @@ fun RecipeScreen(
                                     .height(250.dp)
                                     .fillMaxWidth()
                             ) {
-                                // Existing ingredients
                                 items(allIngredients, key = { it.ingredient.id }) { ingredientWithQty ->
                                     val ingredient = ingredientWithQty.ingredient
                                     val isSelected = selectedIngredients.containsKey(ingredient.id)
@@ -600,7 +608,6 @@ fun RecipeScreen(
                                     }
                                 }
 
-                                // New ingredients — appear right below existing ones
                                 items(tempIngredients, key = { "temp_${it.name}" }) { temp ->
                                     var unitDropdownExpanded by remember { mutableStateOf(false) }
 
@@ -608,7 +615,6 @@ fun RecipeScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        // Spacer to align with the checkbox above
                                         Spacer(modifier = Modifier.width(48.dp))
                                         Text("[NEW] " + temp.name, modifier = Modifier.weight(1f))
                                         OutlinedTextField(
@@ -656,12 +662,11 @@ fun RecipeScreen(
                             }
                         }
 
-                        // Overlay inside the dialog, on top of the content
                         if (isLoading) {
                             Box(
                                 modifier = Modifier
                                     .matchParentSize()
-                                    .clickable(enabled = false) {} // dont allow any taps during loading
+                                    .clickable(enabled = false) {}
                                     .background(Color.Black.copy(alpha = 0.5f)),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -687,7 +692,6 @@ fun RecipeScreen(
                             if (name.isBlank()) { nameError = true; return@Button }
 
                             coroutineScope.launch {
-                                // set the loading message
                                 isLoading = true
                                 loadingMessage = "Adding recipe..."
                                 val currentDate = (System.currentTimeMillis() / 1000).toInt()
@@ -696,7 +700,6 @@ fun RecipeScreen(
                                     name.trim(), instructions.trim(), currentDate
                                 )
 
-                                // Create new ingredients and link them using the returned ID
                                 tempIngredients.forEach { temp ->
                                     val existing = ingredientViewModel.getIngredientByName(temp.name)
 
@@ -704,11 +707,9 @@ fun RecipeScreen(
                                     val targetDensity: Double?
 
                                     if (existing != null) {
-                                        // Already in DB — just link it, don't create a duplicate
                                         targetId = existing.id
                                         targetDensity = existing.density
                                     } else {
-                                        // Actually new — create it
                                         val densityValue = askGeminiForDensity(temp.name)
                                         targetId = ingredientViewModel.addIngredientAndReturnId(
                                             name = temp.name,
@@ -729,7 +730,6 @@ fun RecipeScreen(
                                     )
                                 }
 
-                                // Link existing selected ingredients
                                 selectedIngredients.forEach { (id, qtyString) ->
                                     val qty = qtyString.toDoubleOrNull() ?: 0.0
                                     if (qty > 0) {
@@ -751,21 +751,390 @@ fun RecipeScreen(
 
                                 recipeViewModel.refresh()
                                 showAddDialog = false
-                                // no longer loading
                                 isLoading = false
                                 loadingMessage = ""
                             }
                         },
-                        enabled = !isLoading  // disable button while saving
+                        enabled = !isLoading
                     ) { Text("Save") }
                 },
                 dismissButton = {
                     Button(
                         onClick = { showAddDialog = false },
-                        enabled = !isLoading  // prevent dismissal while saving
+                        enabled = !isLoading
                     ) { Text("Cancel") }
                 }
             )
+        }
+
+        // ---------------- EDIT RECIPE DIALOG ----------------
+
+        if (showEditDialog && editingRecipeId != null) {
+            val recipe = recipes.find { it.id == editingRecipeId }
+
+            if (recipe != null) {
+                var editName by remember { mutableStateOf(recipe.name) }
+                var editInstructions by remember { mutableStateOf(recipe.instructions) }
+                var editNameError by remember { mutableStateOf(false) }
+                var editIngredientError by remember { mutableStateOf<String?>(null) }
+                var newIngredientName by remember { mutableStateOf("") }
+                var isSaving by remember { mutableStateOf(false) }
+
+                // Load existing recipe ingredients into selected maps
+                val editSelectedIngredients = remember { mutableStateMapOf<Long, String>() }
+                val editSelectedUnits = remember { mutableStateMapOf<Long, String>() }
+                val editTempIngredients = remember { mutableStateListOf<TempIngredient>() }
+
+                // Load existing links once when dialog opens
+                LaunchedEffect(editingRecipeId) {
+                    val links = recipeViewModel.getIngredientsForRecipe(recipe.id)
+                    links.forEach { link ->
+                        val ingredient = ingredientViewModel.getIngredientById(link.ingredientId)
+                        if (ingredient != null) {
+                            val displayQty = ingredientViewModel.convertFromGrams(
+                                link.quantityUsed, link.unitUsed, ingredient.density
+                            )
+                            editSelectedIngredients[link.ingredientId] = formatDouble(displayQty)
+                            editSelectedUnits[link.ingredientId] = link.unitUsed
+                        }
+                    }
+                }
+
+                val unitOptions = listOf(
+                    "unit", "g", "kg", "oz", "lb",
+                    "ml", "cup", "tbsp", "tsp", "floz"
+                )
+
+                AlertDialog(
+                    onDismissRequest = {
+                        if (!isSaving) {
+                            showEditDialog = false
+                            editingRecipeId = null
+                        }
+                    },
+                    title = { Text("Edit Recipe") },
+                    text = {
+                        val scrollState = rememberScrollState()
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 500.dp)
+                                .verticalScroll(scrollState),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            // Name field
+                            OutlinedTextField(
+                                value = editName,
+                                onValueChange = { editName = it; editNameError = false },
+                                label = { Text("Recipe Name") },
+                                isError = editNameError,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            // Instructions field
+                            OutlinedTextField(
+                                value = editInstructions,
+                                onValueChange = { editInstructions = it },
+                                label = { Text("Instructions") },
+                                modifier = Modifier.fillMaxWidth(),
+                                minLines = 3
+                            )
+
+                            Divider()
+
+                            // Add brand new ingredient
+                            Text("Add New Ingredient", fontWeight = FontWeight.Bold)
+
+                            Row {
+                                OutlinedTextField(
+                                    value = newIngredientName,
+                                    onValueChange = { newIngredientName = it; editIngredientError = null },
+                                    label = { Text("Ingredient Name") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Button(onClick = {
+                                    val trimmedName = newIngredientName.trim()
+                                    if (trimmedName.isBlank()) return@Button
+
+                                    coroutineScope.launch {
+                                        val existsInDb = ingredientViewModel.getIngredientByName(trimmedName)
+                                        val existsInTemp = editTempIngredients.any {
+                                            it.name.equals(trimmedName, ignoreCase = true)
+                                        }
+                                        if (existsInDb != null || existsInTemp) {
+                                            editIngredientError = "Ingredient already exists"
+                                            return@launch
+                                        }
+                                        editIngredientError = null
+                                        editTempIngredients.add(TempIngredient(trimmedName))
+                                        newIngredientName = ""
+                                    }
+                                }) {
+                                    Text("Add")
+                                }
+                            }
+
+                            editIngredientError?.let {
+                                Text(it, color = Color.Red, fontSize = 14.sp)
+                            }
+
+                            Divider()
+
+                            // Ingredient selection list
+                            Text("Select Ingredients", fontWeight = FontWeight.Bold)
+
+                            LazyColumn(
+                                modifier = Modifier
+                                    .height(250.dp)
+                                    .fillMaxWidth()
+                            ) {
+                                // Existing DB ingredients
+                                items(allIngredients, key = { it.ingredient.id }) { ingredientWithQty ->
+                                    val ingredient = ingredientWithQty.ingredient
+                                    val isSelected = editSelectedIngredients.containsKey(ingredient.id)
+                                    var unitDropdownExpanded by remember { mutableStateOf(false) }
+
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Checkbox(
+                                            checked = isSelected,
+                                            onCheckedChange = { checked ->
+                                                if (checked) {
+                                                    editSelectedIngredients[ingredient.id] = "1.0"
+                                                    editSelectedUnits[ingredient.id] = ingredient.unit.ifBlank { "g" }
+                                                } else {
+                                                    editSelectedIngredients.remove(ingredient.id)
+                                                    editSelectedUnits.remove(ingredient.id)
+                                                }
+                                            }
+                                        )
+                                        Text(ingredient.name, modifier = Modifier.weight(1f))
+
+                                        if (isSelected) {
+                                            OutlinedTextField(
+                                                value = editSelectedIngredients[ingredient.id] ?: "",
+                                                onValueChange = { editSelectedIngredients[ingredient.id] = it },
+                                                label = { Text("Qty") },
+                                                modifier = Modifier.width(70.dp),
+                                                singleLine = true
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            ExposedDropdownMenuBox(
+                                                expanded = unitDropdownExpanded,
+                                                onExpandedChange = { unitDropdownExpanded = it },
+                                                modifier = Modifier.width(100.dp)
+                                            ) {
+                                                OutlinedTextField(
+                                                    value = editSelectedUnits[ingredient.id] ?: ingredient.unit.ifBlank { "g" },
+                                                    onValueChange = {},
+                                                    readOnly = true,
+                                                    label = { Text("Unit") },
+                                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(unitDropdownExpanded) },
+                                                    modifier = Modifier
+                                                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true)
+                                                        .fillMaxWidth(),
+                                                    singleLine = true
+                                                )
+                                                ExposedDropdownMenu(
+                                                    expanded = unitDropdownExpanded,
+                                                    onDismissRequest = { unitDropdownExpanded = false }
+                                                ) {
+                                                    unitOptions.forEach { option ->
+                                                        DropdownMenuItem(
+                                                            text = { Text(option) },
+                                                            onClick = {
+                                                                editSelectedUnits[ingredient.id] = option
+                                                                unitDropdownExpanded = false
+                                                            }
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // New temp ingredients
+                                items(editTempIngredients, key = { "edit_temp_${it.name}" }) { temp ->
+                                    var unitDropdownExpanded by remember { mutableStateOf(false) }
+
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Spacer(modifier = Modifier.width(48.dp))
+                                        Text("[NEW] " + temp.name, modifier = Modifier.weight(1f))
+                                        OutlinedTextField(
+                                            value = temp.quantity,
+                                            onValueChange = { temp.quantity = it },
+                                            label = { Text("Qty") },
+                                            modifier = Modifier.width(70.dp),
+                                            singleLine = true
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        ExposedDropdownMenuBox(
+                                            expanded = unitDropdownExpanded,
+                                            onExpandedChange = { unitDropdownExpanded = it },
+                                            modifier = Modifier.width(100.dp)
+                                        ) {
+                                            OutlinedTextField(
+                                                value = temp.unit,
+                                                onValueChange = {},
+                                                readOnly = true,
+                                                label = { Text("Unit") },
+                                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(unitDropdownExpanded) },
+                                                modifier = Modifier
+                                                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true)
+                                                    .fillMaxWidth(),
+                                                singleLine = true
+                                            )
+                                            ExposedDropdownMenu(
+                                                expanded = unitDropdownExpanded,
+                                                onDismissRequest = { unitDropdownExpanded = false }
+                                            ) {
+                                                unitOptions.forEach { option ->
+                                                    DropdownMenuItem(
+                                                        text = { Text(option) },
+                                                        onClick = { temp.unit = option; unitDropdownExpanded = false }
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        IconButton(onClick = { editTempIngredients.remove(temp) }) {
+                                            Text("X", color = Color.Red, fontSize = 16.sp)
+                                        }
+                                    }
+                                }
+                            }
+
+                            Divider()
+
+                            // Delete button lives inside the edit dialog
+                            Button(
+                                onClick = {
+                                    recipeToDelete = recipe.id
+                                    showDeleteDialog = true
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Delete Recipe")
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                if (editName.isBlank()) { editNameError = true; return@Button }
+
+                                coroutineScope.launch {
+                                    isSaving = true
+
+                                    // Update name and instructions
+                                    recipeViewModel.updateRecipe(
+                                        recipe.copy(
+                                            name = editName.trim(),
+                                            instructions = editInstructions.trim()
+                                        )
+                                    )
+
+                                    // Build the new ingredient list
+                                    val newLinks = mutableListOf<RecipeIngredientEntity>()
+
+                                    // Existing DB ingredients that are checked
+                                    editSelectedIngredients.forEach { (id, qtyString) ->
+                                        val qty = qtyString.toDoubleOrNull() ?: 0.0
+                                        if (qty > 0) {
+                                            val ingredientEntity = allIngredients
+                                                .find { it.ingredient.id == id }?.ingredient
+                                            val selectedUnit = editSelectedUnits[id]
+                                                ?: ingredientEntity?.unit ?: "g"
+                                            val gramsToStore = ingredientViewModel.convertToGrams(
+                                                qty, selectedUnit, ingredientEntity?.density
+                                            )
+                                            newLinks.add(
+                                                RecipeIngredientEntity(
+                                                    recipeId = recipe.id,
+                                                    ingredientId = id,
+                                                    quantityUsed = gramsToStore,
+                                                    unitUsed = selectedUnit
+                                                )
+                                            )
+                                        }
+                                    }
+
+                                    // New temp ingredients — create them in DB first
+                                    editTempIngredients.forEach { temp ->
+                                        val existing = ingredientViewModel.getIngredientByName(temp.name)
+                                        val targetId: Long
+                                        val targetDensity: Double?
+
+                                        if (existing != null) {
+                                            targetId = existing.id
+                                            targetDensity = existing.density
+                                        } else {
+                                            val densityValue = askGeminiForDensity(temp.name)
+                                            targetId = ingredientViewModel.addIngredientAndReturnId(
+                                                name = temp.name,
+                                                unit = temp.unit,
+                                                density = densityValue
+                                            )
+                                            targetDensity = densityValue
+                                        }
+
+                                        val qty = temp.quantity.toDoubleOrNull() ?: 0.0
+                                        val grams = ingredientViewModel.convertToGrams(qty, temp.unit, targetDensity)
+                                        newLinks.add(
+                                            RecipeIngredientEntity(
+                                                recipeId = recipe.id,
+                                                ingredientId = targetId,
+                                                quantityUsed = grams,
+                                                unitUsed = temp.unit
+                                            )
+                                        )
+                                    }
+
+                                    // Replace all ingredient links atomically
+                                    recipeViewModel.replaceIngredientsForRecipe(recipe.id, newLinks)
+
+                                    // Invalidate the cached ingredient text so it reloads
+                                    recipeIngredientsMap.remove(recipe.id)
+
+                                    recipeViewModel.refresh()
+                                    isSaving = false
+                                    showEditDialog = false
+                                    editingRecipeId = null
+                                }
+                            },
+                            enabled = !isSaving
+                        ) {
+                            if (isSaving) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = Color.White
+                                )
+                            } else {
+                                Text("Save")
+                            }
+                        }
+                    },
+                    dismissButton = {
+                        Button(
+                            onClick = {
+                                showEditDialog = false
+                                editingRecipeId = null
+                            },
+                            enabled = !isSaving
+                        ) { Text("Cancel") }
+                    }
+                )
+            }
         }
 
         // ---------------- DELETE RECIPE DIALOG ----------------
@@ -782,7 +1151,10 @@ fun RecipeScreen(
                         onClick = {
                             coroutineScope.launch {
                                 recipeViewModel.deleteRecipeWithIngredients(recipeToDelete!!)
+                                recipeIngredientsMap.remove(recipeToDelete)
                                 showDeleteDialog = false
+                                showEditDialog = false
+                                editingRecipeId = null
                                 recipeToDelete = null
                             }
                         },
@@ -954,12 +1326,11 @@ fun RecipeScreen(
         }
 
         // ---------------- LOADING OVERLAY ----------------
-        // Covers the full screen for the photo analysis phase (before the dialog opens)
         if (isLoading && !showAddDialog) {
             Box(
                 modifier = Modifier
                     .matchParentSize()
-                    .clickable(enabled = false) {} // dont allow any taps during loading
+                    .clickable(enabled = false) {}
                     .background(Color.Black.copy(alpha = 0.5f)),
                 contentAlignment = Alignment.Center
             ) {

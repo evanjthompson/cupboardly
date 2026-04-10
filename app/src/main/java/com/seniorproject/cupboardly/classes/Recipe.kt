@@ -17,6 +17,10 @@ class Recipe(context: Context) {
         return recipeDao.insert(recipe)
     }
 
+    suspend fun updateRecipe(recipe: RecipeEntity) {
+        recipeDao.update(recipe)
+    }
+
     suspend fun addIngredientToRecipe(recipeId: Long, ingredientId: Long, quantityUsed: Double, unitUsed: String) {
         recipeIngredientDao.insert(
             RecipeIngredientEntity(
