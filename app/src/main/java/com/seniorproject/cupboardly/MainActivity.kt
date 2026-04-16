@@ -7,12 +7,9 @@ import androidx.compose.runtime.*
 import com.seniorproject.cupboardly.ui.IngredientScreen
 import com.seniorproject.cupboardly.ui.RecipeScreen
 import com.seniorproject.cupboardly.ui.theme.CupboardlyTheme
-import android.util.Log
-import androidx.lifecycle.lifecycleScope
-import com.google.firebase.Firebase
 import com.google.firebase.FirebaseApp
-import com.google.firebase.ai.ai
-import kotlinx.coroutines.launch
+import com.seniorproject.cupboardly.ui.SettingsScreen
+
 
 class MainActivity : ComponentActivity() {
 
@@ -27,10 +24,18 @@ class MainActivity : ComponentActivity() {
 
                 when (currentScreen) {
                     "ingredients" -> IngredientScreen(
-                        onGoToRecipes = { currentScreen = "recipes" }
+                        onGoToRecipes = { currentScreen = "recipes" },
+                        onGoToSettings = { currentScreen = "settings" }
                     )
+
                     "recipes" -> RecipeScreen(
-                        onGoToIngredients = { currentScreen = "ingredients" }
+                        onGoToIngredients = { currentScreen = "ingredients" },
+                        onGoToSettings = { currentScreen = "settings" }
+                    )
+
+                    "settings" -> SettingsScreen(
+                        onGoToIngredients = { currentScreen = "ingredients" },
+                        onGoToRecipes =  { currentScreen = "recipes" },
                     )
                 }
             }

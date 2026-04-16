@@ -43,13 +43,14 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import android.content.pm.PackageManager
 import androidx.compose.foundation.background
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.FolderCopy
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import androidx.compose.runtime.Composable
-import com.seniorproject.cupboardly.classes.AiRecipe
 import com.seniorproject.cupboardly.classes.askGeminiForRecipeParse
-import com.seniorproject.cupboardly.room.entity.IngredientBatchEntity
 import com.seniorproject.cupboardly.room.entity.RecipeIngredientEntity
 
 // ---------------------------------------------------------------------------
@@ -132,8 +133,9 @@ class TempIngredient(
 fun RecipeScreen(
     recipeViewModel: RecipeViewModel = viewModel(),
     ingredientViewModel: IngredientViewModel = viewModel(),
-    onGoToIngredients: () -> Unit
-) {
+    onGoToIngredients: () -> Unit,
+    onGoToSettings: () -> Unit
+){
     var hasCameraPermission by remember { mutableStateOf(false) }
 
     val recipes by recipeViewModel.recipes.collectAsState()
@@ -262,8 +264,8 @@ fun RecipeScreen(
         }
     }
 
-    val gold = Color(197, 145, 39)
-    val darkBlue = Color(11, 186, 224)
+    val ingredientGold = Color(197, 145, 39)
+    val recipeBlue = Color(11, 186, 224)
 
     Box(
         modifier = Modifier
@@ -285,13 +287,13 @@ fun RecipeScreen(
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Button(
                     onClick = onGoToIngredients,
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = gold,
+                        containerColor = ingredientGold,
                         contentColor = Color.White
                     )
                 ) {
@@ -305,9 +307,22 @@ fun RecipeScreen(
                 Button(
                     onClick = {},
                     modifier = Modifier.weight(2f),
-                    colors = ButtonDefaults.buttonColors(containerColor = darkBlue)
+                    colors = ButtonDefaults.buttonColors(containerColor = recipeBlue)
                 ) {
                     Text("Recipes", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                }
+                Button(
+                    onClick = onGoToSettings,
+                    modifier = Modifier.weight(.75f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.DarkGray,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.FolderCopy,
+                        contentDescription = "Settings"
+                    )
                 }
             }
 
@@ -321,7 +336,7 @@ fun RecipeScreen(
 
                     Surface(
                         shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(2.dp, darkBlue),
+                        border = BorderStroke(2.dp, recipeBlue),
                         color = Color.White,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -353,7 +368,7 @@ fun RecipeScreen(
                                             startDialogIngredientInfo = emptyList()
                                             showStartDialog = true
                                         },
-                                        colors = ButtonDefaults.buttonColors(containerColor = darkBlue),
+                                        colors = ButtonDefaults.buttonColors(containerColor = recipeBlue),
                                         modifier = Modifier.weight(1f)
                                     ) {
                                         Text("Start")
@@ -375,7 +390,7 @@ fun RecipeScreen(
                                             editingRecipeId = recipe.id
                                             showEditDialog = true
                                         },
-                                        colors = ButtonDefaults.buttonColors(containerColor = darkBlue),
+                                        colors = ButtonDefaults.buttonColors(containerColor = recipeBlue),
                                         modifier = Modifier.weight(1f)
                                     ) {
                                         Text("Edit")
@@ -397,9 +412,13 @@ fun RecipeScreen(
             Button(
                 onClick = { showMenu = true },
                 modifier = Modifier.size(64.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = darkBlue)
+                colors = ButtonDefaults.buttonColors(containerColor = recipeBlue),
+                contentPadding = PaddingValues(0.dp)
             ) {
-                Text("+", fontSize = 32.sp)
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Add Recipe"
+                )
             }
 
             DropdownMenu(
@@ -463,8 +482,8 @@ fun RecipeScreen(
             }
 
             val unitOptions = listOf(
-                "unit", "g", "kg", "oz", "lb",
-                "ml", "cup", "tbsp", "tsp", "floz"
+                "g", "kg", "oz", "lb",
+                "ml", "gal", "cup", "tbsp", "tsp", "floz"
             )
 
             AlertDialog(
@@ -685,7 +704,7 @@ fun RecipeScreen(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    CircularProgressIndicator(color = darkBlue)
+                                    CircularProgressIndicator(color = recipeBlue)
                                     Text(
                                         loadingMessage,
                                         fontSize = 16.sp,
@@ -812,8 +831,8 @@ fun RecipeScreen(
                 }
 
                 val unitOptions = listOf(
-                    "unit", "g", "kg", "oz", "lb",
-                    "ml", "cup", "tbsp", "tsp", "floz"
+                    "g", "kg", "oz", "lb",
+                    "ml", "gal", "cup", "tbsp", "tsp", "floz"
                 )
 
                 AlertDialog(
@@ -1341,7 +1360,7 @@ fun RecipeScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        CircularProgressIndicator(color = darkBlue)
+                        CircularProgressIndicator(color = recipeBlue)
                         Text(loadingMessage, fontSize = 16.sp, fontWeight = FontWeight.Medium)
                     }
                 }

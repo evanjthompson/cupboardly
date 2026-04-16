@@ -70,6 +70,7 @@ dependencies {
     implementation("com.google.firebase:firebase-ai")
     implementation("com.google.guava:guava:31.1-android")
     implementation("com.google.mlkit:text-recognition:16.0.0")
+    implementation("androidx.compose.material:material-icons-extended")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     {
         exclude(group = "com.google.guava", module = "listenablefuture")

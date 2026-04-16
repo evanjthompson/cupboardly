@@ -9,6 +9,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.FolderCopy
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -118,8 +121,12 @@ fun darkTextFieldColors() = OutlinedTextFieldDefaults.colors(
 @Composable
 fun IngredientScreen(
     viewModel: IngredientViewModel = viewModel(),
-    onGoToRecipes: () -> Unit
+    onGoToRecipes: () -> Unit,
+    onGoToSettings: () -> Unit
 ) {
+    LaunchedEffect(Unit) {
+        viewModel.refresh()
+    }
     val scope = rememberCoroutineScope()
     val sdf = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
 
@@ -137,8 +144,8 @@ fun IngredientScreen(
     var newQuantityError by remember { mutableStateOf<String?>(null) }
     var newPriceError by remember { mutableStateOf<String?>(null) }
 
-    val gold = Color(197, 145, 39)
-    val darkBlue = Color(11, 186, 224)
+    val ingredientGold = Color(197, 145, 39)
+    val recipeBlue = Color(11, 186, 224)
 
     Box(
         modifier = Modifier
@@ -163,13 +170,13 @@ fun IngredientScreen(
                 // Tab row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Button(
                         onClick = {},
                         modifier = Modifier.weight(2f),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = gold,
+                            containerColor = ingredientGold,
                             contentColor = Color.White
                         )
                     ) {
@@ -179,11 +186,24 @@ fun IngredientScreen(
                         onClick = onGoToRecipes,
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = darkBlue,
+                            containerColor = recipeBlue,
                             contentColor = Color.White
                         )
                     ) {
                         Text("Recipes")
+                    }
+                    Button(
+                        onClick = onGoToSettings,
+                        modifier = Modifier.weight(.75f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.DarkGray,
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FolderCopy,
+                            contentDescription = "Settings"
+                        )
                     }
                 }
 
@@ -261,7 +281,7 @@ fun IngredientScreen(
 
                         Surface(
                             shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(2.dp, gold),
+                            border = BorderStroke(2.dp, ingredientGold),
                             color = Color.White,
                             contentColor = Color.Black,
                             modifier = Modifier
@@ -375,7 +395,8 @@ fun IngredientScreen(
                                             val addMoreUnitOptions = if (ingredient.unit == "unit") {
                                                 listOf("unit")
                                             } else {
-                                                listOf("g", "kg", "oz", "lb", "ml", "gal", "cup", "tbsp", "tsp", "floz")
+                                                listOf("g", "kg", "oz", "lb",
+                                                    "ml", "gal", "cup", "tbsp", "tsp", "floz")
                                             }
                                             var addMoreUnitDropdownExpanded by remember { mutableStateOf(false) }
 
@@ -485,7 +506,7 @@ fun IngredientScreen(
                                                         addMorePriceError = null
                                                         isAddingMore = false
                                                     },
-                                                    colors = ButtonDefaults.buttonColors(containerColor = gold),
+                                                    colors = ButtonDefaults.buttonColors(containerColor = ingredientGold),
                                                     modifier = Modifier.weight(1f)
                                                 ) { Text("Cancel") }
 
@@ -529,7 +550,7 @@ fun IngredientScreen(
                                                             isAddingMore = false
                                                         }
                                                     },
-                                                    colors = ButtonDefaults.buttonColors(containerColor = gold),
+                                                    colors = ButtonDefaults.buttonColors(containerColor = ingredientGold),
                                                     modifier = Modifier.weight(1f)
                                                 ) { Text("Confirm") }
                                             }
@@ -591,7 +612,7 @@ fun IngredientScreen(
                                                         Surface(
                                                             shape = RoundedCornerShape(6.dp),
                                                             color = Color.White,
-                                                            border = BorderStroke(1.dp, gold),
+                                                            border = BorderStroke(1.dp, ingredientGold),
                                                             modifier = Modifier
                                                                 .fillMaxWidth()
                                                                 .padding(vertical = 4.dp)
@@ -699,7 +720,7 @@ fun IngredientScreen(
                                                                             batchEditQuantityError = null
                                                                             batchEditPriceError = null
                                                                         },
-                                                                        colors = ButtonDefaults.buttonColors(containerColor = gold),
+                                                                        colors = ButtonDefaults.buttonColors(containerColor = ingredientGold),
                                                                         modifier = Modifier.weight(1f)
                                                                     ) { Text("Cancel") }
 
@@ -736,7 +757,7 @@ fun IngredientScreen(
                                                                                 editingBatchId = null
                                                                             }
                                                                         },
-                                                                        colors = ButtonDefaults.buttonColors(containerColor = gold),
+                                                                        colors = ButtonDefaults.buttonColors(containerColor = ingredientGold),
                                                                         modifier = Modifier.weight(1f)
                                                                     ) { Text("Save") }
 
@@ -819,7 +840,7 @@ fun IngredientScreen(
                                                         editingBatchId = null
                                                         deleteBlockedMessage = null
                                                     },
-                                                    colors = ButtonDefaults.buttonColors(containerColor = gold),
+                                                    colors = ButtonDefaults.buttonColors(containerColor = ingredientGold),
                                                     modifier = Modifier.weight(1f)
                                                 ) { Text("Cancel") }
 
@@ -850,7 +871,7 @@ fun IngredientScreen(
                                                             deleteBlockedMessage = null
                                                         }
                                                     },
-                                                    colors = ButtonDefaults.buttonColors(containerColor = gold),
+                                                    colors = ButtonDefaults.buttonColors(containerColor = ingredientGold),
                                                     modifier = Modifier.weight(1f)
                                                 ) { Text("Confirm") }
 
@@ -965,7 +986,7 @@ fun IngredientScreen(
                                                         addMorePrice = ""
                                                         addMoreExpirationStr = ""
                                                     },
-                                                    colors = ButtonDefaults.buttonColors(containerColor = gold),
+                                                    colors = ButtonDefaults.buttonColors(containerColor = ingredientGold),
                                                     modifier = Modifier.weight(1f)
                                                 ) { Text("Add More") }
 
@@ -978,7 +999,7 @@ fun IngredientScreen(
                                                         editingBatchId = null
                                                         deleteBlockedMessage = null
                                                     },
-                                                    colors = ButtonDefaults.buttonColors(containerColor = gold),
+                                                    colors = ButtonDefaults.buttonColors(containerColor = ingredientGold),
                                                     modifier = Modifier.weight(1f)
                                                 ) { Text("Edit") }
 
@@ -1009,17 +1030,15 @@ fun IngredientScreen(
                     .padding(35.dp)
                     .size(64.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = gold,
+                    containerColor = ingredientGold,
                     contentColor = Color.White
                 ),
                 contentPadding = PaddingValues(0.dp)
             ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    Text("+", fontSize = 32.sp)
-                }
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Add Ingredient"
+                )
             }
 
             // -----------------------------------------------------------------------
