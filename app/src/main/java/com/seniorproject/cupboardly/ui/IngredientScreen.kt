@@ -36,6 +36,9 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 
 // ---------------------------------------------------------------------------
 // Utilities
@@ -67,7 +70,20 @@ fun unixToDateStr(unix: Int?): String {
         ""
     }
 }
+fun getExpirationColor(expirationDate: Int): Color {
+    val todayUnix = parseDateToUnix(
+        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+    ) ?: return Color.Gray
 
+    val diffDays = (expirationDate - todayUnix) / (60 * 60 * 24)
+
+    return when {
+        diffDays < 0 -> Color(0xFFC62828)      // expired
+        diffDays <= 3 -> Color(0xFFFF8C00)     // close to expiring
+        diffDays <= 7 -> Color(0xFFD4A017)     // getting close
+        else -> Color(0xFF2E7D32)              // still good
+    }
+}
 @Composable
 fun AutoSizeText(
     text: String,
@@ -816,7 +832,16 @@ fun IngredientScreen(
                                                                     style = MaterialTheme.typography.bodyMedium
                                                                 )
                                                                 Text(
-                                                                    "$addedText$expirationText",
+                                                                    text = buildAnnotatedString {
+                                                                        append(addedText)
+
+                                                                        batch.expirationDate?.let { expDate ->
+                                                                            append("  ·  ")
+                                                                            withStyle(SpanStyle(color = getExpirationColor(expDate))) {
+                                                                                append("Expires ${sdf.format(Date(expDate * 1000L))}")
+                                                                            }
+                                                                        }
+                                                                    },
                                                                     style = MaterialTheme.typography.bodySmall,
                                                                     color = Color.Gray
                                                                 )
