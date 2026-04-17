@@ -45,6 +45,7 @@ import android.content.pm.PackageManager
 import androidx.compose.foundation.background
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.FolderCopy
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
@@ -105,8 +106,14 @@ suspend fun deductFromBatchesFifo(
             remaining -= batch.quantity
             ingredientViewModel.deleteBatch(batch)
         } else {
-            ingredientViewModel.updateBatch(batch.copy(quantity = batch.quantity - remaining))
+            val newQty = batch.quantity - remaining
             remaining = 0.0
+            // Auto-delete if the remaining quantity is effectively zero
+            if (newQty <= 0.0) {
+                ingredientViewModel.deleteBatch(batch)
+            } else {
+                ingredientViewModel.updateBatch(batch.copy(quantity = newQty))
+            }
         }
     }
 }
@@ -165,6 +172,7 @@ fun RecipeScreen(
     var showEditDialog by remember { mutableStateOf(false) }
     var editingRecipeId by remember { mutableStateOf<Long?>(null) }
 
+    // Camera launcher — can be triggered from inside the Add dialog too
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
@@ -206,6 +214,8 @@ fun RecipeScreen(
                                 )
                             }
                         }
+                        // Close and reopen the dialog so it picks up the new prefill values
+                        showAddDialog = false
                         showAddDialog = true
                     }
                 }
@@ -222,7 +232,26 @@ fun RecipeScreen(
         hasCameraPermission = isGranted
     }
 
-    var showMenu by remember { mutableStateOf(false) }
+    // Helper: launch camera (requests permission first if needed)
+    fun launchCamera() {
+        if (hasCameraPermission) {
+            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+            val photoFile = File(
+                context.getExternalFilesDir(Environment.DIRECTORY_PICTURES),
+                "JPEG_${timestamp}_.jpg"
+            )
+            val uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                photoFile
+            )
+            photoUri = uri
+            cameraLauncher.launch(uri)
+        } else {
+            permissionLauncher.launch(android.Manifest.permission.CAMERA)
+        }
+    }
+
     var showStartDialog by remember { mutableStateOf(false) }
     var activeRecipe by remember { mutableStateOf<Long?>(null) }
     var startError by remember { mutableStateOf<String?>(null) }
@@ -403,60 +432,27 @@ fun RecipeScreen(
             }
         }
 
-        // dropdown
-        Box(
+        // FAB — single tap opens Add Recipe dialog directly (no dropdown)
+        Button(
+            onClick = {
+                prefillName = ""
+                prefillInstructions = ""
+                prefillTempIngredients.clear()
+                prefillSelectedIngredients.clear()
+                prefillSelectedUnits.clear()
+                showAddDialog = true
+            },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(35.dp)
+                .size(64.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = recipeBlue),
+            contentPadding = PaddingValues(0.dp)
         ) {
-            Button(
-                onClick = { showMenu = true },
-                modifier = Modifier.size(64.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = recipeBlue),
-                contentPadding = PaddingValues(0.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Add Recipe"
-                )
-            }
-
-            DropdownMenu(
-                expanded = showMenu,
-                onDismissRequest = { showMenu = false }
-            ) {
-                DropdownMenuItem(
-                    text = { Text("Add Recipe") },
-                    onClick = {
-                        showMenu = false
-                        prefillName = ""
-                        prefillInstructions = ""
-                        prefillTempIngredients.clear()
-                        showAddDialog = true
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("Take Photo") },
-                    onClick = {
-                        if (hasCameraPermission) {
-                            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-                            val photoFile = File(
-                                context.getExternalFilesDir(Environment.DIRECTORY_PICTURES),
-                                "JPEG_${timestamp}_.jpg"
-                            )
-                            val uri = FileProvider.getUriForFile(
-                                context,
-                                "${context.packageName}.fileprovider",
-                                photoFile
-                            )
-                            photoUri = uri
-                            cameraLauncher.launch(uri)
-                        } else {
-                            permissionLauncher.launch(android.Manifest.permission.CAMERA)
-                        }
-                    }
-                )
-            }
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = "Add Recipe"
+            )
         }
 
         // ---------------- ADD RECIPE DIALOG ----------------
@@ -487,6 +483,9 @@ fun RecipeScreen(
             )
 
             AlertDialog(
+                containerColor = Color.White,
+                titleContentColor = Color.Black,
+                textContentColor = Color.Black,
                 onDismissRequest = {
                     showAddDialog = false
                     prefillName = ""
@@ -717,83 +716,106 @@ fun RecipeScreen(
                     }
                 },
                 confirmButton = {
-                    Button(
-                        onClick = {
-                            if (name.isBlank()) { nameError = true; return@Button }
+                    // Bottom row: Camera | Cancel | Save
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Camera button (moved here from the FAB dropdown)
+                        Button(
+                            onClick = { launchCamera() },
+                            enabled = !isLoading,
+                            colors = ButtonDefaults.buttonColors(containerColor = recipeBlue),
+                            contentPadding = PaddingValues(horizontal = 12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CameraAlt,
+                                contentDescription = "Scan Recipe Photo"
+                            )
+                        }
 
-                            coroutineScope.launch {
-                                isLoading = true
-                                loadingMessage = "Adding recipe..."
-                                val currentDate = (System.currentTimeMillis() / 1000).toInt()
+                        Spacer(modifier = Modifier.weight(1f))
 
-                                val recipeId = recipeViewModel.addRecipeAndReturnId(
-                                    name.trim(), instructions.trim(), currentDate
-                                )
+                        Button(
+                            onClick = { showAddDialog = false },
+                            enabled = !isLoading
+                        ) { Text("Cancel") }
 
-                                tempIngredients.forEach { temp ->
-                                    val existing = ingredientViewModel.getIngredientByName(temp.name)
+                        Button(
+                            onClick = {
+                                if (name.isBlank()) { nameError = true; return@Button }
 
-                                    val targetId: Long
-                                    val targetDensity: Double?
+                                coroutineScope.launch {
+                                    isLoading = true
+                                    loadingMessage = "Adding recipe..."
+                                    val currentDate = (System.currentTimeMillis() / 1000).toInt()
 
-                                    if (existing != null) {
-                                        targetId = existing.id
-                                        targetDensity = existing.density
-                                    } else {
-                                        val densityValue = askGeminiForDensity(temp.name)
-                                        targetId = ingredientViewModel.addIngredientAndReturnId(
-                                            name = temp.name,
-                                            unit = temp.unit,
-                                            density = densityValue
-                                        )
-                                        targetDensity = densityValue
-                                    }
-
-                                    val qty = temp.quantity.toDoubleOrNull() ?: 0.0
-                                    val grams = ingredientViewModel.convertToGrams(qty, temp.unit, targetDensity)
-
-                                    recipeViewModel.addIngredientToRecipe(
-                                        recipeId,
-                                        targetId,
-                                        grams,
-                                        temp.unit
+                                    val recipeId = recipeViewModel.addRecipeAndReturnId(
+                                        name.trim(), instructions.trim(), currentDate
                                     )
-                                }
 
-                                selectedIngredients.forEach { (id, qtyString) ->
-                                    val qty = qtyString.toDoubleOrNull() ?: 0.0
-                                    if (qty > 0) {
-                                        val ingredientEntity = allIngredients
-                                            .find { it.ingredient.id == id }?.ingredient
+                                    tempIngredients.forEach { temp ->
+                                        val existing = ingredientViewModel.getIngredientByName(temp.name)
 
-                                        val selectedUnit = selectedUnits[id]
-                                            ?: ingredientEntity?.unit ?: "g"
+                                        val targetId: Long
+                                        val targetDensity: Double?
 
-                                        val gramsToStore = ingredientViewModel.convertToGrams(
-                                            qty, selectedUnit, ingredientEntity?.density
-                                        )
+                                        if (existing != null) {
+                                            targetId = existing.id
+                                            targetDensity = existing.density
+                                        } else {
+                                            val densityValue = askGeminiForDensity(temp.name)
+                                            targetId = ingredientViewModel.addIngredientAndReturnId(
+                                                name = temp.name,
+                                                unit = temp.unit,
+                                                density = densityValue
+                                            )
+                                            targetDensity = densityValue
+                                        }
+
+                                        val qty = temp.quantity.toDoubleOrNull() ?: 0.0
+                                        val grams = ingredientViewModel.convertToGrams(qty, temp.unit, targetDensity)
 
                                         recipeViewModel.addIngredientToRecipe(
-                                            recipeId, id, gramsToStore, selectedUnit
+                                            recipeId,
+                                            targetId,
+                                            grams,
+                                            temp.unit
                                         )
                                     }
-                                }
 
-                                recipeViewModel.refresh()
-                                showAddDialog = false
-                                isLoading = false
-                                loadingMessage = ""
-                            }
-                        },
-                        enabled = !isLoading
-                    ) { Text("Save") }
+                                    selectedIngredients.forEach { (id, qtyString) ->
+                                        val qty = qtyString.toDoubleOrNull() ?: 0.0
+                                        if (qty > 0) {
+                                            val ingredientEntity = allIngredients
+                                                .find { it.ingredient.id == id }?.ingredient
+
+                                            val selectedUnit = selectedUnits[id]
+                                                ?: ingredientEntity?.unit ?: "g"
+
+                                            val gramsToStore = ingredientViewModel.convertToGrams(
+                                                qty, selectedUnit, ingredientEntity?.density
+                                            )
+
+                                            recipeViewModel.addIngredientToRecipe(
+                                                recipeId, id, gramsToStore, selectedUnit
+                                            )
+                                        }
+                                    }
+
+                                    recipeViewModel.refresh()
+                                    showAddDialog = false
+                                    isLoading = false
+                                    loadingMessage = ""
+                                }
+                            },
+                            enabled = !isLoading
+                        ) { Text("Save") }
+                    }
                 },
-                dismissButton = {
-                    Button(
-                        onClick = { showAddDialog = false },
-                        enabled = !isLoading
-                    ) { Text("Cancel") }
-                }
+                // dismissButton is intentionally empty — buttons are all in confirmButton row
+                dismissButton = {}
             )
         }
 
@@ -810,12 +832,10 @@ fun RecipeScreen(
                 var newIngredientName by remember { mutableStateOf("") }
                 var isSaving by remember { mutableStateOf(false) }
 
-                // Load existing recipe ingredients into selected maps
                 val editSelectedIngredients = remember { mutableStateMapOf<Long, String>() }
                 val editSelectedUnits = remember { mutableStateMapOf<Long, String>() }
                 val editTempIngredients = remember { mutableStateListOf<TempIngredient>() }
 
-                // Load existing links once when dialog opens
                 LaunchedEffect(editingRecipeId) {
                     val links = recipeViewModel.getIngredientsForRecipe(recipe.id)
                     links.forEach { link ->
@@ -836,6 +856,9 @@ fun RecipeScreen(
                 )
 
                 AlertDialog(
+                    containerColor = Color.White,
+                    titleContentColor = Color.Black,
+                    textContentColor = Color.Black,
                     onDismissRequest = {
                         if (!isSaving) {
                             showEditDialog = false
@@ -853,7 +876,6 @@ fun RecipeScreen(
                                 .verticalScroll(scrollState),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            // Name field
                             OutlinedTextField(
                                 value = editName,
                                 onValueChange = { editName = it; editNameError = false },
@@ -862,7 +884,6 @@ fun RecipeScreen(
                                 modifier = Modifier.fillMaxWidth()
                             )
 
-                            // Instructions field
                             OutlinedTextField(
                                 value = editInstructions,
                                 onValueChange = { editInstructions = it },
@@ -873,7 +894,6 @@ fun RecipeScreen(
 
                             Divider()
 
-                            // Add brand new ingredient
                             Text("Add New Ingredient", fontWeight = FontWeight.Bold)
 
                             Row {
@@ -912,7 +932,6 @@ fun RecipeScreen(
 
                             Divider()
 
-                            // Ingredient selection list
                             Text("Select Ingredients", fontWeight = FontWeight.Bold)
 
                             LazyColumn(
@@ -920,7 +939,6 @@ fun RecipeScreen(
                                     .height(250.dp)
                                     .fillMaxWidth()
                             ) {
-                                // Existing DB ingredients
                                 items(allIngredients, key = { it.ingredient.id }) { ingredientWithQty ->
                                     val ingredient = ingredientWithQty.ingredient
                                     val isSelected = editSelectedIngredients.containsKey(ingredient.id)
@@ -988,7 +1006,6 @@ fun RecipeScreen(
                                     }
                                 }
 
-                                // New temp ingredients
                                 items(editTempIngredients, key = { "edit_temp_${it.name}" }) { temp ->
                                     var unitDropdownExpanded by remember { mutableStateOf(false) }
 
@@ -1041,7 +1058,6 @@ fun RecipeScreen(
                                     }
                                 }
                             }
-
                         }
                     },
                     confirmButton = {
@@ -1052,7 +1068,6 @@ fun RecipeScreen(
                                 coroutineScope.launch {
                                     isSaving = true
 
-                                    // Update name and instructions
                                     recipeViewModel.updateRecipe(
                                         recipe.copy(
                                             name = editName.trim(),
@@ -1060,10 +1075,8 @@ fun RecipeScreen(
                                         )
                                     )
 
-                                    // Build the new ingredient list
                                     val newLinks = mutableListOf<RecipeIngredientEntity>()
 
-                                    // Existing DB ingredients that are checked
                                     editSelectedIngredients.forEach { (id, qtyString) ->
                                         val qty = qtyString.toDoubleOrNull() ?: 0.0
                                         if (qty > 0) {
@@ -1085,7 +1098,6 @@ fun RecipeScreen(
                                         }
                                     }
 
-                                    // New temp ingredients — create them in DB first
                                     editTempIngredients.forEach { temp ->
                                         val existing = ingredientViewModel.getIngredientByName(temp.name)
                                         val targetId: Long
@@ -1116,10 +1128,7 @@ fun RecipeScreen(
                                         )
                                     }
 
-                                    // Replace all ingredient links atomically
                                     recipeViewModel.replaceIngredientsForRecipe(recipe.id, newLinks)
-
-                                    // Invalidate the cached ingredient text so it reloads
                                     recipeIngredientsMap.remove(recipe.id)
 
                                     recipeViewModel.refresh()
@@ -1160,6 +1169,9 @@ fun RecipeScreen(
             val recipeName = recipes.find { it.id == recipeToDelete }?.name ?: ""
 
             AlertDialog(
+                containerColor = Color.White,
+                titleContentColor = Color.Black,
+                textContentColor = Color.Black,
                 onDismissRequest = { showDeleteDialog = false },
                 title = { Text("Delete Recipe") },
                 text = { Text("Delete \"$recipeName\"? This cannot be undone.") },
@@ -1214,6 +1226,9 @@ fun RecipeScreen(
             }
 
             AlertDialog(
+                containerColor = Color.White,
+                titleContentColor = Color.Black,
+                textContentColor = Color.Black,
                 onDismissRequest = { showStartDialog = false },
                 title = { Text("Start Recipe") },
                 text = {
@@ -1301,6 +1316,9 @@ fun RecipeScreen(
         if (showOverrideConfirmDialog && activeRecipe != null) {
 
             AlertDialog(
+                containerColor = Color.White,
+                titleContentColor = Color.Black,
+                textContentColor = Color.Black,
                 onDismissRequest = { showOverrideConfirmDialog = false },
                 title = { Text("Are you sure?") },
                 text = {

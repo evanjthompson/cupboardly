@@ -113,9 +113,6 @@ fun AutoSizeText(
 
 // ---------------------------------------------------------------------------
 // Date Picker Field
-// A reusable composable that shows a text field + calendar icon button.
-// Tapping the icon (or field) opens a DatePickerDialog.
-// `unixSeconds` is nullable — null means "no date selected".
 // ---------------------------------------------------------------------------
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -135,7 +132,6 @@ fun ExpirationDateField(
 
     var showPicker by remember { mutableStateOf(false) }
 
-    // Pre-select the current value (or today) when opening the picker
     val datePickerState = rememberDatePickerState(
         initialSelectedDateMillis = unixSeconds?.let { it * 1000L }
             ?: System.currentTimeMillis()
@@ -166,7 +162,6 @@ fun ExpirationDateField(
             onDismissRequest = { showPicker = false },
             confirmButton = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Allow clearing the date
                     TextButton(onClick = {
                         onDateSelected(null)
                         showPicker = false
@@ -213,11 +208,6 @@ fun darkTextFieldColors() = OutlinedTextFieldDefaults.colors(
 // Helper: expiration string
 // ---------------------------------------------------------------------------
 
-/**
- * Returns an AnnotatedString with the "Added ..." prefix in [baseColor] and
- * the "Expires ..." suffix colored by [getExpirationColor]. If [expirationDate]
- * is null the expiration segment is omitted.
- */
 @Composable
 fun expirationAnnotatedString(
     addedText: String,
@@ -368,7 +358,7 @@ fun IngredientScreen(
                         var editName by remember { mutableStateOf(ingredient.name) }
                         var editNameError by remember { mutableStateOf<String?>(null) }
 
-                        // Which batch is currently being edited in edit mode (null = none)
+                        // Which batch is currently being edited in edit mode
                         var editingBatchId by remember { mutableStateOf<Long?>(null) }
 
                         // Per-batch edit state
@@ -390,7 +380,12 @@ fun IngredientScreen(
                         // Delete guard message
                         var deleteBlockedMessage by remember { mutableStateOf<String?>(null) }
 
-                        // Derived display quantity (total in current display unit)
+                        // Confirmation dialog state
+                        var showDeleteIngredientConfirm by remember { mutableStateOf(false) }
+                        var showResetConfirm by remember { mutableStateOf(false) }
+                        var batchPendingDelete by remember { mutableStateOf<IngredientBatchEntity?>(null) }
+
+                        // Derived display quantity
                         val displayQty =
                             remember(totalQuantityGrams, ingredient.density, displayUnit) {
                                 viewModel.convertFromGrams(
@@ -399,6 +394,115 @@ fun IngredientScreen(
                                     ingredient.density
                                 )
                             }
+
+                        // -----------------------------------------------------------------------
+                        // Confirmation: delete a single batch
+                        // -----------------------------------------------------------------------
+                        if (batchPendingDelete != null) {
+                            val batchQtyDisplay = viewModel.convertFromGrams(
+                                batchPendingDelete!!.quantity, displayUnit, ingredient.density
+                            )
+                            AlertDialog(
+                                containerColor = Color.White,
+                                titleContentColor = Color.Black,
+                                textContentColor = Color.Black,
+                                onDismissRequest = { batchPendingDelete = null },
+                                title = { Text("Delete Batch") },
+                                text = {
+                                    Text(
+                                        "Delete the batch of ${formatDouble(batchQtyDisplay)} $displayUnit " +
+                                                "(added ${sdf.format(Date(batchPendingDelete!!.dateAdded * 1000L))})? " +
+                                                "This cannot be undone."
+                                    )
+                                },
+                                confirmButton = {
+                                    Button(
+                                        onClick = {
+                                            viewModel.deleteBatch(batchPendingDelete!!)
+                                            editingBatchId = null
+                                            batchPendingDelete = null
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                                    ) { Text("Delete") }
+                                },
+                                dismissButton = {
+                                    Button(onClick = { batchPendingDelete = null }) { Text("Cancel") }
+                                }
+                            )
+                        }
+
+                        // -----------------------------------------------------------------------
+                        // Confirmation: delete entire ingredient
+                        // -----------------------------------------------------------------------
+                        if (showDeleteIngredientConfirm) {
+                            AlertDialog(
+                                containerColor = Color.White,
+                                titleContentColor = Color.Black,
+                                textContentColor = Color.Black,
+                                onDismissRequest = { showDeleteIngredientConfirm = false },
+                                title = { Text("Delete Ingredient") },
+                                text = {
+                                    Text(
+                                        "Delete \"${ingredient.name}\" and all its batches? This cannot be undone."
+                                    )
+                                },
+                                confirmButton = {
+                                    Button(
+                                        onClick = {
+                                            scope.launch {
+                                                val inUse = viewModel.isUsedByRecipe(ingredient.id)
+                                                if (inUse) {
+                                                    deleteBlockedMessage = "In use by a recipe"
+                                                } else {
+                                                    viewModel.deleteIngredient(ingredient)
+                                                    isEditing = false
+                                                    viewModel.refresh()
+                                                    editingBatchId = null
+                                                    deleteBlockedMessage = null
+                                                }
+                                                showDeleteIngredientConfirm = false
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                                    ) { Text("Delete") }
+                                },
+                                dismissButton = {
+                                    Button(onClick = { showDeleteIngredientConfirm = false }) {
+                                        Text("Cancel")
+                                    }
+                                }
+                            )
+                        }
+
+                        // -----------------------------------------------------------------------
+                        // Confirmation: reset ingredient (clear all batches)
+                        // -----------------------------------------------------------------------
+                        if (showResetConfirm) {
+                            AlertDialog(
+                                containerColor = Color.White,
+                                titleContentColor = Color.Black,
+                                textContentColor = Color.Black,
+                                onDismissRequest = { showResetConfirm = false },
+                                title = { Text("Reset Ingredient") },
+                                text = {
+                                    Text(
+                                        "Reset \"${ingredient.name}\"? This will clear all batches and set the quantity to 0. This cannot be undone."
+                                    )
+                                },
+                                confirmButton = {
+                                    Button(
+                                        onClick = {
+                                            viewModel.resetIngredient(ingredient.id)
+                                            showResetConfirm = false
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF888888))
+                                    ) { Text("Reset") }
+                                },
+                                dismissButton = {
+                                    Button(onClick = { showResetConfirm = false }) { Text("Cancel") }
+                                }
+                            )
+                        }
 
                         Surface(
                             shape = RoundedCornerShape(10.dp),
@@ -425,9 +529,7 @@ fun IngredientScreen(
                                     .padding(16.dp)
                             ) {
 
-                                // -----------------------------------------------------------
-                                // Header row: name + quantity + live unit switcher
-                                // -----------------------------------------------------------
+                                // Header row
                                 when {
                                     isEditing -> {
                                         Text(
@@ -500,15 +602,11 @@ fun IngredientScreen(
                                     }
                                 }
 
-                                // -----------------------------------------------------------
                                 // Expanded content
-                                // -----------------------------------------------------------
                                 if (expanded) {
                                     when {
 
-                                        // -------------------------------------------------------
-                                        // ADD MORE: create a new batch
-                                        // -------------------------------------------------------
+                                        // ADD MORE
                                         isAddingMore -> {
                                             Spacer(modifier = Modifier.height(8.dp))
 
@@ -604,7 +702,6 @@ fun IngredientScreen(
                                                 modifier = Modifier.fillMaxWidth()
                                             )
 
-                                            // Date picker replaces manual text field
                                             ExpirationDateField(
                                                 unixSeconds = addMoreExpirationUnix,
                                                 onDateSelected = { addMoreExpirationUnix = it },
@@ -673,9 +770,7 @@ fun IngredientScreen(
                                             }
                                         }
 
-                                        // -------------------------------------------------------
-                                        // EDIT: modify ingredient name; tap a batch to edit it
-                                        // -------------------------------------------------------
+                                        // EDIT
                                         isEditing -> {
                                             Spacer(modifier = Modifier.height(8.dp))
 
@@ -816,7 +911,6 @@ fun IngredientScreen(
                                                                     modifier = Modifier.fillMaxWidth()
                                                                 )
 
-                                                                // Date picker replaces manual text field
                                                                 ExpirationDateField(
                                                                     unixSeconds = batchEditExpirationUnix,
                                                                     onDateSelected = { batchEditExpirationUnix = it },
@@ -872,10 +966,10 @@ fun IngredientScreen(
                                                                         modifier = Modifier.weight(1f)
                                                                     ) { Text("Save") }
 
+                                                                    // Delete batch — now shows confirmation dialog
                                                                     Button(
                                                                         onClick = {
-                                                                            viewModel.deleteBatch(batch)
-                                                                            editingBatchId = null
+                                                                            batchPendingDelete = batch
                                                                         },
                                                                         colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                                                                         modifier = Modifier.weight(0.75f)
@@ -891,7 +985,6 @@ fun IngredientScreen(
                                                             }
                                                         }
                                                     } else {
-                                                        // Tappable batch summary row (edit mode)
                                                         val addedText = "Added ${sdf.format(Date(batch.dateAdded * 1000L))}"
 
                                                         Surface(
@@ -921,7 +1014,6 @@ fun IngredientScreen(
                                                                     "${formatDouble(batchDisplayQty)} $displayUnit  —  $${formatDouble(batch.price)}",
                                                                     style = MaterialTheme.typography.bodyMedium
                                                                 )
-                                                                // Colored expiration (edit-mode read rows)
                                                                 Text(
                                                                     text = expirationAnnotatedString(
                                                                         addedText = addedText,
@@ -986,21 +1078,9 @@ fun IngredientScreen(
                                                     modifier = Modifier.weight(1f)
                                                 ) { Text("Confirm") }
 
+                                                // Delete ingredient — now shows confirmation dialog
                                                 Button(
-                                                    onClick = {
-                                                        scope.launch {
-                                                            val inUse = viewModel.isUsedByRecipe(ingredient.id)
-                                                            if (inUse) {
-                                                                deleteBlockedMessage = "In use by a recipe"
-                                                            } else {
-                                                                viewModel.deleteIngredient(ingredient)
-                                                                isEditing = false
-                                                                viewModel.refresh()
-                                                                editingBatchId = null
-                                                                deleteBlockedMessage = null
-                                                            }
-                                                        }
-                                                    },
+                                                    onClick = { showDeleteIngredientConfirm = true },
                                                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                                                     modifier = Modifier.weight(0.75f)
                                                 ) {
@@ -1023,9 +1103,7 @@ fun IngredientScreen(
                                             }
                                         }
 
-                                        // -------------------------------------------------------
-                                        // DEFAULT: show batch list (read-only) + action buttons
-                                        // -------------------------------------------------------
+                                        // DEFAULT VIEW
                                         else -> {
                                             Spacer(modifier = Modifier.height(8.dp))
 
@@ -1065,7 +1143,6 @@ fun IngredientScreen(
                                                                 "${formatDouble(batchDisplayQty)} $displayUnit  —  $${formatDouble(batch.price)}  ·  $${formatDouble(batchCostPerUnit)}/$displayUnit",
                                                                 style = MaterialTheme.typography.bodyMedium
                                                             )
-                                                            // Colored expiration (default read-only rows)
                                                             Text(
                                                                 text = expirationAnnotatedString(
                                                                     addedText = addedText,
@@ -1113,10 +1190,9 @@ fun IngredientScreen(
                                                     modifier = Modifier.weight(1f)
                                                 ) { Text("Edit") }
 
+                                                // Reset — now shows confirmation dialog
                                                 Button(
-                                                    onClick = {
-                                                        viewModel.resetIngredient(ingredient.id)
-                                                    },
+                                                    onClick = { showResetConfirm = true },
                                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF888888)),
                                                     modifier = Modifier.weight(1f)
                                                 ) { Text("Reset") }
@@ -1130,9 +1206,7 @@ fun IngredientScreen(
                 }
             }
 
-            // -----------------------------------------------------------------------
-            // open Add New dialog
-            // -----------------------------------------------------------------------
+            // Add New button
             Button(
                 onClick = { showAddNew = true },
                 modifier = Modifier
@@ -1151,9 +1225,7 @@ fun IngredientScreen(
                 )
             }
 
-            // -----------------------------------------------------------------------
-            // Add New dialog — creates ingredient definition + first batch
-            // -----------------------------------------------------------------------
+            // Add New dialog
             if (showAddNew) {
                 var dialogDropdownExpanded by remember { mutableStateOf(false) }
 
@@ -1358,7 +1430,6 @@ fun IngredientScreen(
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            // Date picker
                             ExpirationDateField(
                                 unixSeconds = newExpirationUnix,
                                 onDateSelected = { newExpirationUnix = it },
