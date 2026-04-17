@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.FolderCopy
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -36,6 +37,9 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 
 // ---------------------------------------------------------------------------
 // Utilities
@@ -68,6 +72,21 @@ fun unixToDateStr(unix: Int?): String {
     }
 }
 
+fun getExpirationColor(expirationDate: Int): Color {
+    val todayUnix = parseDateToUnix(
+        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+    ) ?: return Color.Gray
+
+    val diffDays = (expirationDate - todayUnix) / (60 * 60 * 24)
+
+    return when {
+        diffDays < 0 -> Color(0xFFC62828)      // expired
+        diffDays <= 3 -> Color(0xFFFF8C00)     // close to expiring
+        diffDays <= 7 -> Color(0xFFD4A017)     // getting close
+        else -> Color(0xFF2E7D32)              // still good
+    }
+}
+
 @Composable
 fun AutoSizeText(
     text: String,
@@ -93,6 +112,83 @@ fun AutoSizeText(
 }
 
 // ---------------------------------------------------------------------------
+// Date Picker Field
+// A reusable composable that shows a text field + calendar icon button.
+// Tapping the icon (or field) opens a DatePickerDialog.
+// `unixSeconds` is nullable — null means "no date selected".
+// ---------------------------------------------------------------------------
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ExpirationDateField(
+    unixSeconds: Int?,
+    onDateSelected: (Int?) -> Unit,
+    modifier: Modifier = Modifier,
+    label: String = "Expiration Date (optional)"
+) {
+    val displaySdf = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
+    val displayText = if (unixSeconds != null) {
+        displaySdf.format(Date(unixSeconds * 1000L))
+    } else {
+        ""
+    }
+
+    var showPicker by remember { mutableStateOf(false) }
+
+    // Pre-select the current value (or today) when opening the picker
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = unixSeconds?.let { it * 1000L }
+            ?: System.currentTimeMillis()
+    )
+
+    OutlinedTextField(
+        colors = darkTextFieldColors(),
+        value = displayText,
+        onValueChange = {},
+        readOnly = true,
+        label = { Text(label) },
+        placeholder = { Text("None") },
+        trailingIcon = {
+            IconButton(onClick = { showPicker = true }) {
+                Icon(
+                    imageVector = Icons.Default.CalendarMonth,
+                    contentDescription = "Pick date",
+                    tint = Color.Black
+                )
+            }
+        },
+        modifier = modifier
+            .clickable { showPicker = true }
+    )
+
+    if (showPicker) {
+        DatePickerDialog(
+            onDismissRequest = { showPicker = false },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Allow clearing the date
+                    TextButton(onClick = {
+                        onDateSelected(null)
+                        showPicker = false
+                    }) { Text("Clear") }
+
+                    TextButton(onClick = {
+                        val millis = datePickerState.selectedDateMillis
+                        onDateSelected(millis?.let { (it / 1000).toInt() })
+                        showPicker = false
+                    }) { Text("OK") }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Shared text field colors
 // ---------------------------------------------------------------------------
 
@@ -112,6 +208,31 @@ fun darkTextFieldColors() = OutlinedTextFieldDefaults.colors(
     unfocusedSupportingTextColor = Color(0xFF444444),
     cursorColor = Color.Black
 )
+
+// ---------------------------------------------------------------------------
+// Helper: expiration string
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns an AnnotatedString with the "Added ..." prefix in [baseColor] and
+ * the "Expires ..." suffix colored by [getExpirationColor]. If [expirationDate]
+ * is null the expiration segment is omitted.
+ */
+@Composable
+fun expirationAnnotatedString(
+    addedText: String,
+    expirationDate: Int?,
+    sdf: SimpleDateFormat,
+    baseColor: Color = Color.Gray
+) = buildAnnotatedString {
+    withStyle(SpanStyle(color = baseColor)) { append(addedText) }
+    expirationDate?.let { expDate ->
+        withStyle(SpanStyle(color = baseColor)) { append("  ·  ") }
+        withStyle(SpanStyle(color = getExpirationColor(expDate))) {
+            append("Expires ${sdf.format(Date(expDate * 1000L))}")
+        }
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -138,7 +259,7 @@ fun IngredientScreen(
     var newQuantity by remember { mutableStateOf("") }
     var newUnit by remember { mutableStateOf("g") }
     var newPrice by remember { mutableStateOf("") }
-    var newExpirationStr by remember { mutableStateOf("") }
+    var newExpirationUnix by remember { mutableStateOf<Int?>(null) }
 
     var newNameError by remember { mutableStateOf<String?>(null) }
     var newQuantityError by remember { mutableStateOf<String?>(null) }
@@ -250,11 +371,11 @@ fun IngredientScreen(
                         // Which batch is currently being edited in edit mode (null = none)
                         var editingBatchId by remember { mutableStateOf<Long?>(null) }
 
-                        // Per-batch edit state — keyed by batch id, populated when a batch row is tapped
+                        // Per-batch edit state
                         var batchEditQuantity by remember { mutableStateOf("") }
                         var batchEditUnit by remember { mutableStateOf(ingredient.unit) }
                         var batchEditPrice by remember { mutableStateOf("") }
-                        var batchEditExpirationStr by remember { mutableStateOf("") }
+                        var batchEditExpirationUnix by remember { mutableStateOf<Int?>(null) }
                         var batchEditQuantityError by remember { mutableStateOf<String?>(null) }
                         var batchEditPriceError by remember { mutableStateOf<String?>(null) }
 
@@ -262,7 +383,7 @@ fun IngredientScreen(
                         var addMoreQuantity by remember { mutableStateOf("") }
                         var addMoreUnit by remember { mutableStateOf(ingredient.unit) }
                         var addMorePrice by remember { mutableStateOf("") }
-                        var addMoreExpirationStr by remember { mutableStateOf("") }
+                        var addMoreExpirationUnix by remember { mutableStateOf<Int?>(null) }
                         var addMoreQuantityError by remember { mutableStateOf<String?>(null) }
                         var addMorePriceError by remember { mutableStateOf<String?>(null) }
 
@@ -391,7 +512,6 @@ fun IngredientScreen(
                                         isAddingMore -> {
                                             Spacer(modifier = Modifier.height(8.dp))
 
-                                            // Quantity + unit row
                                             val addMoreUnitOptions = if (ingredient.unit == "unit") {
                                                 listOf("unit")
                                             } else {
@@ -456,7 +576,6 @@ fun IngredientScreen(
                                                                     text = { Text(option, color = Color.Black) },
                                                                     onClick = {
                                                                         addMoreUnit = option
-                                                                        // Keep display unit in sync
                                                                         displayUnit = option
                                                                         addMoreUnitDropdownExpanded = false
                                                                     }
@@ -485,10 +604,10 @@ fun IngredientScreen(
                                                 modifier = Modifier.fillMaxWidth()
                                             )
 
-                                            OutlinedTextField(
-                                                value = addMoreExpirationStr,
-                                                onValueChange = { addMoreExpirationStr = it },
-                                                label = { Text("Expiration Date (YYYY-MM-DD, optional)") },
+                                            // Date picker replaces manual text field
+                                            ExpirationDateField(
+                                                unixSeconds = addMoreExpirationUnix,
+                                                onDateSelected = { addMoreExpirationUnix = it },
                                                 modifier = Modifier.fillMaxWidth()
                                             )
 
@@ -501,7 +620,7 @@ fun IngredientScreen(
                                                         addMoreQuantity = ""
                                                         addMoreUnit = ingredient.unit
                                                         addMorePrice = ""
-                                                        addMoreExpirationStr = ""
+                                                        addMoreExpirationUnix = null
                                                         addMoreQuantityError = null
                                                         addMorePriceError = null
                                                         isAddingMore = false
@@ -526,27 +645,25 @@ fun IngredientScreen(
                                                         }
 
                                                         if (valid) {
-                                                            // Convert from whatever unit the user picked into grams
                                                             val gramsToAdd = viewModel.convertToGrams(
                                                                 quantityValue!!,
                                                                 addMoreUnit,
                                                                 ingredient.density
                                                             )
                                                             val currentDate = (System.currentTimeMillis() / 1000).toInt()
-                                                            val expirationDate = parseDateToUnix(addMoreExpirationStr)
 
                                                             viewModel.addBatch(
                                                                 ingredientId = ingredient.id,
                                                                 quantity = gramsToAdd,
                                                                 price = priceValue!!,
-                                                                expirationDate = expirationDate,
+                                                                expirationDate = addMoreExpirationUnix,
                                                                 dateAdded = currentDate
                                                             )
 
                                                             addMoreQuantity = ""
                                                             addMoreUnit = ingredient.unit
                                                             addMorePrice = ""
-                                                            addMoreExpirationStr = ""
+                                                            addMoreExpirationUnix = null
                                                             isAddingMore = false
                                                         }
                                                     },
@@ -562,7 +679,6 @@ fun IngredientScreen(
                                         isEditing -> {
                                             Spacer(modifier = Modifier.height(8.dp))
 
-                                            // Name field only — no unit dropdown
                                             OutlinedTextField(
                                                 colors = darkTextFieldColors(),
                                                 value = editName,
@@ -579,7 +695,6 @@ fun IngredientScreen(
 
                                             Spacer(modifier = Modifier.height(8.dp))
 
-                                            // Batch list — tappable rows
                                             if (batches.isEmpty()) {
                                                 Text(
                                                     "No batches recorded",
@@ -601,7 +716,6 @@ fun IngredientScreen(
                                                     )
 
                                                     if (isThisBatchEditing) {
-                                                        // Inline batch edit form
                                                         val batchEditUnitOptions = if (ingredient.unit == "unit") {
                                                             listOf("unit")
                                                         } else {
@@ -702,10 +816,10 @@ fun IngredientScreen(
                                                                     modifier = Modifier.fillMaxWidth()
                                                                 )
 
-                                                                OutlinedTextField(
-                                                                    value = batchEditExpirationStr,
-                                                                    onValueChange = { batchEditExpirationStr = it },
-                                                                    label = { Text("Expiration Date (YYYY-MM-DD, optional)") },
+                                                                // Date picker replaces manual text field
+                                                                ExpirationDateField(
+                                                                    unixSeconds = batchEditExpirationUnix,
+                                                                    onDateSelected = { batchEditExpirationUnix = it },
                                                                     modifier = Modifier.fillMaxWidth()
                                                                 )
 
@@ -713,7 +827,6 @@ fun IngredientScreen(
                                                                     modifier = Modifier.fillMaxWidth(),
                                                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                                                 ) {
-                                                                    // Cancel batch edit
                                                                     Button(
                                                                         onClick = {
                                                                             editingBatchId = null
@@ -724,7 +837,6 @@ fun IngredientScreen(
                                                                         modifier = Modifier.weight(1f)
                                                                     ) { Text("Cancel") }
 
-                                                                    // Save batch changes
                                                                     Button(
                                                                         onClick = {
                                                                             val qVal = batchEditQuantity.toDoubleOrNull()
@@ -746,12 +858,11 @@ fun IngredientScreen(
                                                                                     batchEditUnit,
                                                                                     ingredient.density
                                                                                 )
-                                                                                val newExpiration = parseDateToUnix(batchEditExpirationStr)
                                                                                 viewModel.updateBatch(
                                                                                     batch.copy(
                                                                                         quantity = newGrams,
                                                                                         price = pVal!!,
-                                                                                        expirationDate = newExpiration
+                                                                                        expirationDate = batchEditExpirationUnix
                                                                                     )
                                                                                 )
                                                                                 editingBatchId = null
@@ -761,7 +872,6 @@ fun IngredientScreen(
                                                                         modifier = Modifier.weight(1f)
                                                                     ) { Text("Save") }
 
-                                                                    // Delete this batch
                                                                     Button(
                                                                         onClick = {
                                                                             viewModel.deleteBatch(batch)
@@ -781,11 +891,8 @@ fun IngredientScreen(
                                                             }
                                                         }
                                                     } else {
-                                                        // Tappable batch summary row
+                                                        // Tappable batch summary row (edit mode)
                                                         val addedText = "Added ${sdf.format(Date(batch.dateAdded * 1000L))}"
-                                                        val expirationText = batch.expirationDate?.let {
-                                                            "  ·  Expires ${sdf.format(Date(it * 1000L))}"
-                                                        } ?: ""
 
                                                         Surface(
                                                             shape = RoundedCornerShape(4.dp),
@@ -794,7 +901,6 @@ fun IngredientScreen(
                                                                 .fillMaxWidth()
                                                                 .padding(vertical = 3.dp)
                                                                 .clickable {
-                                                                    // Populate edit fields from this batch
                                                                     editingBatchId = batch.id
                                                                     batchEditUnit = displayUnit
                                                                     batchEditQuantity = formatDouble(
@@ -805,7 +911,7 @@ fun IngredientScreen(
                                                                         )
                                                                     )
                                                                     batchEditPrice = formatDouble(batch.price)
-                                                                    batchEditExpirationStr = unixToDateStr(batch.expirationDate)
+                                                                    batchEditExpirationUnix = batch.expirationDate
                                                                     batchEditQuantityError = null
                                                                     batchEditPriceError = null
                                                                 }
@@ -815,10 +921,14 @@ fun IngredientScreen(
                                                                     "${formatDouble(batchDisplayQty)} $displayUnit  —  $${formatDouble(batch.price)}",
                                                                     style = MaterialTheme.typography.bodyMedium
                                                                 )
+                                                                // Colored expiration (edit-mode read rows)
                                                                 Text(
-                                                                    "$addedText$expirationText",
-                                                                    style = MaterialTheme.typography.bodySmall,
-                                                                    color = Color.Gray
+                                                                    text = expirationAnnotatedString(
+                                                                        addedText = addedText,
+                                                                        expirationDate = batch.expirationDate,
+                                                                        sdf = sdf
+                                                                    ),
+                                                                    style = MaterialTheme.typography.bodySmall
                                                                 )
                                                             }
                                                         }
@@ -829,7 +939,6 @@ fun IngredientScreen(
 
                                             Spacer(modifier = Modifier.height(12.dp))
 
-                                            // Confirm name / Cancel / Delete ingredient
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
                                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -837,6 +946,7 @@ fun IngredientScreen(
                                                 Button(
                                                     onClick = {
                                                         isEditing = false
+                                                        viewModel.refresh()
                                                         editingBatchId = null
                                                         deleteBlockedMessage = null
                                                     },
@@ -867,6 +977,7 @@ fun IngredientScreen(
                                                                 ingredient.copy(name = trimmedName)
                                                             )
                                                             isEditing = false
+                                                            viewModel.refresh()
                                                             editingBatchId = null
                                                             deleteBlockedMessage = null
                                                         }
@@ -875,7 +986,6 @@ fun IngredientScreen(
                                                     modifier = Modifier.weight(1f)
                                                 ) { Text("Confirm") }
 
-                                                // Delete — blocked if ingredient is used by a recipe
                                                 Button(
                                                     onClick = {
                                                         scope.launch {
@@ -885,6 +995,7 @@ fun IngredientScreen(
                                                             } else {
                                                                 viewModel.deleteIngredient(ingredient)
                                                                 isEditing = false
+                                                                viewModel.refresh()
                                                                 editingBatchId = null
                                                                 deleteBlockedMessage = null
                                                             }
@@ -902,7 +1013,6 @@ fun IngredientScreen(
                                                 }
                                             }
 
-                                            // Show blocked message below the button row if needed
                                             deleteBlockedMessage?.let { msg ->
                                                 Text(
                                                     text = msg,
@@ -943,11 +1053,7 @@ fun IngredientScreen(
                                                     val batchCostPerUnit =
                                                         if (batchDisplayQty > 0) batch.price / batchDisplayQty else 0.0
                                                     val addedText = "Added ${sdf.format(Date(batch.dateAdded * 1000L))}"
-                                                    val expirationText = batch.expirationDate?.let {
-                                                        "  ·  Expires ${sdf.format(Date(it * 1000L))}"
-                                                    } ?: ""
 
-                                                    // Read-only row — no delete button
                                                     Row(
                                                         modifier = Modifier
                                                             .fillMaxWidth()
@@ -959,10 +1065,14 @@ fun IngredientScreen(
                                                                 "${formatDouble(batchDisplayQty)} $displayUnit  —  $${formatDouble(batch.price)}  ·  $${formatDouble(batchCostPerUnit)}/$displayUnit",
                                                                 style = MaterialTheme.typography.bodyMedium
                                                             )
+                                                            // Colored expiration (default read-only rows)
                                                             Text(
-                                                                "$addedText$expirationText",
-                                                                style = MaterialTheme.typography.bodySmall,
-                                                                color = Color.Gray
+                                                                text = expirationAnnotatedString(
+                                                                    addedText = addedText,
+                                                                    expirationDate = batch.expirationDate,
+                                                                    sdf = sdf
+                                                                ),
+                                                                style = MaterialTheme.typography.bodySmall
                                                             )
                                                         }
                                                     }
@@ -972,7 +1082,6 @@ fun IngredientScreen(
 
                                             Spacer(modifier = Modifier.height(12.dp))
 
-                                            // Action buttons: Add More | Edit | Reset
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
                                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -981,10 +1090,11 @@ fun IngredientScreen(
                                                     onClick = {
                                                         isAddingMore = true
                                                         isEditing = false
+                                                        viewModel.refresh()
                                                         addMoreQuantity = ""
                                                         addMoreUnit = ingredient.unit
                                                         addMorePrice = ""
-                                                        addMoreExpirationStr = ""
+                                                        addMoreExpirationUnix = null
                                                     },
                                                     colors = ButtonDefaults.buttonColors(containerColor = ingredientGold),
                                                     modifier = Modifier.weight(1f)
@@ -1059,7 +1169,7 @@ fun IngredientScreen(
                     onDismissRequest = {
                         showAddNew = false
                         newName = ""; newQuantity = ""; newUnit = "g"; newPrice = ""
-                        newExpirationStr = ""
+                        newExpirationUnix = null
                         newNameError = null; newQuantityError = null; newPriceError = null
                     },
                     confirmButton = {
@@ -1101,8 +1211,6 @@ fun IngredientScreen(
                                     else -> askGeminiForDensity(trimmedName)
                                 }
 
-                                val expirationDate = parseDateToUnix(newExpirationStr)
-
                                 viewModel.addIngredient(
                                     name = trimmedName,
                                     quantity = quantityValue!!,
@@ -1110,11 +1218,11 @@ fun IngredientScreen(
                                     unit = newUnit,
                                     price = priceValue!!,
                                     dateEntered = currentDate,
-                                    expirationDate = expirationDate
+                                    expirationDate = newExpirationUnix
                                 )
 
                                 newName = ""; newQuantity = ""; newUnit = "g"; newPrice = ""
-                                newExpirationStr = ""
+                                newExpirationUnix = null
                                 showAddNew = false
                             }
                         }) { Text("Add") }
@@ -1123,7 +1231,7 @@ fun IngredientScreen(
                         Button(onClick = {
                             showAddNew = false
                             newName = ""; newQuantity = ""; newUnit = "g"; newPrice = ""
-                            newExpirationStr = ""
+                            newExpirationUnix = null
                             newNameError = null; newQuantityError = null; newPriceError = null
                         }) { Text("Cancel") }
                     },
@@ -1250,11 +1358,10 @@ fun IngredientScreen(
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            OutlinedTextField(
-                                colors = darkTextFieldColors(),
-                                value = newExpirationStr,
-                                onValueChange = { newExpirationStr = it },
-                                label = { Text("Expiration Date (YYYY-MM-DD, optional)") },
+                            // Date picker
+                            ExpirationDateField(
+                                unixSeconds = newExpirationUnix,
+                                onDateSelected = { newExpirationUnix = it },
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
