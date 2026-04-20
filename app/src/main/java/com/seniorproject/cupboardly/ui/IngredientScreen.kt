@@ -3,6 +3,7 @@ package com.seniorproject.cupboardly.ui
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,6 +13,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderCopy
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,7 +28,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.sp
 import com.seniorproject.cupboardly.R
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,16 +66,6 @@ fun parseDateToUnix(dateStr: String): Int? {
     }
 }
 
-fun unixToDateStr(unix: Int?): String {
-    if (unix == null) return ""
-    return try {
-        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        sdf.format(Date(unix * 1000L))
-    } catch (e: Exception) {
-        ""
-    }
-}
-
 fun getExpirationColor(expirationDate: Int): Color {
     val todayUnix = parseDateToUnix(
         SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
@@ -84,6 +78,39 @@ fun getExpirationColor(expirationDate: Int): Color {
         diffDays <= 3 -> Color(0xFFFF8C00)     // close to expiring
         diffDays <= 7 -> Color(0xFFD4A017)     // getting close
         else -> Color(0xFF2E7D32)              // still good
+    }
+}
+
+/** Deduct from ingredient batches using FIFO (first-in, first-out) order. */
+suspend fun deductFromBatchesFifo(
+    ingredientId: Long,
+    quantityInUnit: Double,
+    unit: String,
+    density: Double,
+    ingredientViewModel: IngredientViewModel
+) {
+    // Convert the quantity to grams for internal calculation
+    val gramsNeeded = ingredientViewModel.convertToGrams(quantityInUnit, unit, density)
+    val batches = ingredientViewModel.getBatchesForIngredient(ingredientId).sortedBy { it.dateAdded }
+
+    var remaining = gramsNeeded
+
+    for (batch in batches) {
+        if (remaining <= 0.0) break
+
+        if (batch.quantity <= remaining) {
+            remaining -= batch.quantity
+            ingredientViewModel.deleteBatch(batch)
+        } else {
+            val newQty = batch.quantity - remaining
+            remaining = 0.0
+
+            if (newQty <= 0.0) {
+                ingredientViewModel.deleteBatch(batch)
+            } else {
+                ingredientViewModel.updateBatch(batch.copy(quantity = newQty))
+            }
+        }
     }
 }
 
@@ -231,17 +258,108 @@ fun expirationAnnotatedString(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IngredientScreen(
+    currentScreen: String,
     viewModel: IngredientViewModel = viewModel(),
     onGoToRecipes: () -> Unit,
-    onGoToSettings: () -> Unit
+    onGoToManageData: () -> Unit
 ) {
     LaunchedEffect(Unit) {
         viewModel.refresh()
     }
+
     val scope = rememberCoroutineScope()
     val sdf = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
 
     val ingredients by viewModel.ingredients.collectAsState()
+
+    // ---------------------------------------------------------------------------
+    // Expired ingredients popup state
+    // ---------------------------------------------------------------------------
+    var expiredIngredients by remember { mutableStateOf<List<Pair<String, Date>>>(emptyList()) }
+    var showExpiredDialog by remember { mutableStateOf(false) }
+    var expiredCheckDone by remember { mutableStateOf(false) }
+
+    LaunchedEffect(ingredients) {
+        if (ingredients.isNotEmpty() && !expiredCheckDone) {
+            expiredCheckDone = true
+            val nowUnix = (System.currentTimeMillis() / 1000).toInt()
+            val expired = mutableListOf<Pair<String, Date>>()
+            ingredients.forEach { ingredientWithQty ->
+                val ing = ingredientWithQty.ingredient
+                val batches = viewModel.getBatchesForIngredient(ing.id)
+                batches.forEach { batch ->
+                    val exp = batch.expirationDate
+                    if (exp != null && exp < nowUnix) {
+                        expired.add(Pair(ing.name, Date(exp * 1000L)))
+                    }
+                }
+            }
+            if (expired.isNotEmpty()) {
+                expiredIngredients = expired
+                showExpiredDialog = true
+            }
+        }
+    }
+
+    // Expired ingredients dialog
+    if (showExpiredDialog) {
+        AlertDialog(
+            containerColor = Color.White,
+            titleContentColor = Color.Black,
+            textContentColor = Color.Black,
+            onDismissRequest = { showExpiredDialog = false },
+            title = {
+                Text(
+                    "⚠️ Expired Ingredients",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        "The following batches have expired:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    expiredIngredients.forEach { (name, expDate) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "• ",
+                                color = Color(0xFFC62828),
+                                fontWeight = FontWeight.Bold
+                            )
+                            Column {
+                                Text(
+                                    name,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.Black
+                                )
+                                Text(
+                                    "Expired ${sdf.format(expDate)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color(0xFFC62828)
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showExpiredDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828))
+                ) {
+                    Text("Dismiss")
+                }
+            }
+        )
+    }
 
     // Add-new dialog state
     var showAddNew by remember { mutableStateOf(false) }
@@ -255,8 +373,11 @@ fun IngredientScreen(
     var newQuantityError by remember { mutableStateOf<String?>(null) }
     var newPriceError by remember { mutableStateOf<String?>(null) }
 
-    val ingredientGold = Color(197, 145, 39)
-    val recipeBlue = Color(11, 186, 224)
+    val ingredientGold = Color(162, 119, 0)
+    val recipeBlue = Color(91, 177, 184)
+
+    // Search state
+    var searchQuery by remember { mutableStateOf("") }
 
     Box(
         modifier = Modifier
@@ -278,50 +399,79 @@ fun IngredientScreen(
                     .fillMaxSize()
                     .padding(16.dp)
             ) {
-                // Tab row
+                // Ingredients + Recipes nav buttons
+                TopNavTabs(
+                    currentScreen = currentScreen,
+                    onGoToIngredients = {}, // already on this screen
+                    onGoToRecipes = onGoToRecipes,
+                    ingredientGold = ingredientGold,
+                    recipeBlue = recipeBlue
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            color = Color(0x22000000), // shared translucent background
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .padding(horizontal = 6.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+
+                    // Search field
+                    OutlinedTextField(
+                        colors = darkTextFieldColors(),
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        label = { Text("Search ingredients") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Text,
+                            imeAction = ImeAction.Search
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 56.dp)
+                    )
+
+                    // Manage data button
                     Button(
-                        onClick = {},
-                        modifier = Modifier.weight(2f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = ingredientGold,
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Text("Ingredients", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Button(
-                        onClick = onGoToRecipes,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = recipeBlue,
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Text("Recipes")
-                    }
-                    Button(
-                        onClick = onGoToSettings,
-                        modifier = Modifier.weight(.75f),
+                        onClick = onGoToManageData,
+                        modifier = Modifier.size(50.dp),
+                        shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color.DarkGray,
                             contentColor = Color.White
-                        )
+                        ),
+                        contentPadding = PaddingValues(0.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.FolderCopy,
-                            contentDescription = "Settings"
+                            contentDescription = "Manage Data"
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
 
-                if (ingredients.isEmpty()) {
-                    Text("No ingredients yet")
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Filter ingredients by search query
+                val filteredIngredients = remember(ingredients, searchQuery) {
+                    if (searchQuery.isBlank()) ingredients
+                    else ingredients.filter {
+                        it.ingredient.name.contains(searchQuery.trim(), ignoreCase = true)
+                    }
+                }
+
+                if (filteredIngredients.isEmpty()) {
+                    Text(
+                        if (searchQuery.isBlank()) "No ingredients yet"
+                        else "No ingredients match \"$searchQuery\""
+                    )
                 }
 
                 // ---------------------------------------------------------------------------
@@ -329,7 +479,7 @@ fun IngredientScreen(
                 // ---------------------------------------------------------------------------
                 LazyColumn {
                     items(
-                        items = ingredients,
+                        items = filteredIngredients,
                         key = { it.ingredient.id }
                     ) { ingredientWithQty ->
 
@@ -383,6 +533,9 @@ fun IngredientScreen(
                         // Confirmation dialog state
                         var showDeleteIngredientConfirm by remember { mutableStateOf(false) }
                         var showResetConfirm by remember { mutableStateOf(false) }
+                        var showUseSomeDialog by remember { mutableStateOf(false) }
+                        var useSomeQuantity by remember { mutableStateOf("") }
+                        var useSomeError by remember { mutableStateOf<String?>(null) }
                         var batchPendingDelete by remember { mutableStateOf<IngredientBatchEntity?>(null) }
 
                         // Derived display quantity
@@ -500,6 +653,136 @@ fun IngredientScreen(
                                 },
                                 dismissButton = {
                                     Button(onClick = { showResetConfirm = false }) { Text("Cancel") }
+                                }
+                            )
+                        }
+
+                        // Use Some dialog — deduct quantity from batches in FIFO order
+                        // -----------------------------------------------------------------------
+                        if (showUseSomeDialog) {
+                            val unitOptions = if (ingredient.unit == "unit") {
+                                listOf("unit")
+                            } else {
+                                listOf("g", "kg", "oz", "lb", "ml", "gal", "cup", "tbsp", "tsp", "floz")
+                            }
+                            var useSomeUnitDropdownExpanded by remember { mutableStateOf(false) }
+                            var useSomeUnit by remember { mutableStateOf(ingredient.unit) }
+
+                            AlertDialog(
+                                containerColor = Color.White,
+                                titleContentColor = Color.Black,
+                                textContentColor = Color.Black,
+                                onDismissRequest = { showUseSomeDialog = false; useSomeQuantity = ""; useSomeError = null },
+                                title = { Text("Use ${ingredient.name}") },
+                                text = {
+                                    Column {
+                                        Text(
+                                            "How much would you like to use?",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            modifier = Modifier.padding(bottom = 8.dp)
+                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            OutlinedTextField(
+                                                colors = darkTextFieldColors(),
+                                                value = useSomeQuantity,
+                                                onValueChange = { useSomeQuantity = it; useSomeError = null },
+                                                label = { Text("Quantity") },
+                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                isError = useSomeError != null,
+                                                modifier = Modifier.weight(1f),
+                                                supportingText = {
+                                                    useSomeError?.let {
+                                                        Text(it, color = MaterialTheme.colorScheme.error)
+                                                    }
+                                                }
+                                            )
+
+                                            if (ingredient.unit != "unit") {
+                                                ExposedDropdownMenuBox(
+                                                    expanded = useSomeUnitDropdownExpanded,
+                                                    onExpandedChange = { useSomeUnitDropdownExpanded = it },
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
+                                                    OutlinedTextField(
+                                                        colors = darkTextFieldColors(),
+                                                        value = useSomeUnit,
+                                                        onValueChange = {},
+                                                        readOnly = true,
+                                                        label = { Text("Unit") },
+                                                        trailingIcon = {
+                                                            ExposedDropdownMenuDefaults.TrailingIcon(useSomeUnitDropdownExpanded)
+                                                        },
+                                                        modifier = Modifier
+                                                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true)
+                                                            .fillMaxWidth()
+                                                    )
+                                                    ExposedDropdownMenu(
+                                                        containerColor = Color.White,
+                                                        expanded = useSomeUnitDropdownExpanded,
+                                                        onDismissRequest = { useSomeUnitDropdownExpanded = false }
+                                                    ) {
+                                                        unitOptions.forEach { option ->
+                                                            DropdownMenuItem(
+                                                                text = { Text(option, color = Color.Black) },
+                                                                onClick = { useSomeUnit = option; useSomeUnitDropdownExpanded = false }
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                confirmButton = {
+                                    Button(onClick = {
+                                        val quantityValue = useSomeQuantity.toDoubleOrNull()
+                                        var valid = true
+
+                                        if (quantityValue == null || quantityValue <= 0) {
+                                            useSomeError = "Quantity must be > 0"
+                                            valid = false
+                                        }
+
+                                        if (valid) {
+                                            scope.launch {
+                                                deductFromBatchesFifo(
+                                                    ingredient.id,
+                                                    quantityValue!!,
+                                                    useSomeUnit,
+                                                    ingredient.density,
+                                                    viewModel
+                                                )
+                                                viewModel.refresh()
+                                                showUseSomeDialog = false
+                                                useSomeQuantity = ""
+                                                useSomeError = null
+                                            }
+                                        }
+                                    }) { 
+                                        Text(
+                                            "Use",
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        ) 
+                                    }
+                                },
+                                dismissButton = {
+                                    Button(
+                                        onClick = { 
+                                            showUseSomeDialog = false
+                                            useSomeQuantity = ""
+                                            useSomeError = null
+                                        }
+                                    ) { 
+                                        Text(
+                                            "Cancel",
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
                             )
                         }
@@ -1033,7 +1316,8 @@ fun IngredientScreen(
 
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                verticalAlignment = Alignment.CenterVertically
                                             ) {
                                                 Button(
                                                     onClick = {
@@ -1076,20 +1360,42 @@ fun IngredientScreen(
                                                     },
                                                     colors = ButtonDefaults.buttonColors(containerColor = ingredientGold),
                                                     modifier = Modifier.weight(1f)
-                                                ) { Text("Confirm") }
+                                                ) { Text("Save") }
 
-                                                // Delete ingredient — now shows confirmation dialog
-                                                Button(
-                                                    onClick = { showDeleteIngredientConfirm = true },
-                                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
-                                                    modifier = Modifier.weight(0.75f)
-                                                ) {
-                                                    AutoSizeText(
-                                                        text = "Delete",
-                                                        maxFontSize = 16.sp,
-                                                        minFontSize = 8.sp,
+                                                var showMoreMenu by remember { mutableStateOf(false) }
+                                                Box(modifier = Modifier.weight(0.4f)) {
+                                                    Button(
+                                                        onClick = { showMoreMenu = true },
+                                                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                                                         modifier = Modifier.fillMaxWidth()
-                                                    )
+                                                    ) {
+                                                        Box(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Text("⌄")
+                                                        }
+                                                    }
+                                                    DropdownMenu(
+                                                        expanded = showMoreMenu,
+                                                        onDismissRequest = { showMoreMenu = false },
+                                                        containerColor = Color.White
+                                                    ) {
+                                                        DropdownMenuItem(
+                                                            text = { Text("Reset", color = Color(0xFF888888)) },
+                                                            onClick = {
+                                                                showMoreMenu = false
+                                                                showResetConfirm = true
+                                                            }
+                                                        )
+                                                        DropdownMenuItem(
+                                                            text = { Text("Delete", color = Color.Red) },
+                                                            onClick = {
+                                                                showMoreMenu = false
+                                                                showDeleteIngredientConfirm = true
+                                                            }
+                                                        )
+                                                    }
                                                 }
                                             }
 
@@ -1175,7 +1481,25 @@ fun IngredientScreen(
                                                     },
                                                     colors = ButtonDefaults.buttonColors(containerColor = ingredientGold),
                                                     modifier = Modifier.weight(1f)
-                                                ) { Text("Add More") }
+                                                ) { 
+                                                    Text(
+                                                        "Add +",
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    ) 
+                                                }
+
+                                                Button(
+                                                    onClick = { showUseSomeDialog = true; useSomeQuantity = ""; useSomeError = null },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = ingredientGold),
+                                                    modifier = Modifier.weight(1f)
+                                                ) { 
+                                                    Text(
+                                                        "Use -",
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    ) 
+                                                }
 
                                                 Button(
                                                     onClick = {
@@ -1188,14 +1512,13 @@ fun IngredientScreen(
                                                     },
                                                     colors = ButtonDefaults.buttonColors(containerColor = ingredientGold),
                                                     modifier = Modifier.weight(1f)
-                                                ) { Text("Edit") }
-
-                                                // Reset — now shows confirmation dialog
-                                                Button(
-                                                    onClick = { showResetConfirm = true },
-                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF888888)),
-                                                    modifier = Modifier.weight(1f)
-                                                ) { Text("Reset") }
+                                                ) { 
+                                                    Text(
+                                                        "Edit",
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    ) 
+                                                }
                                             }
                                         }
                                     }
@@ -1297,7 +1620,15 @@ fun IngredientScreen(
                                 newExpirationUnix = null
                                 showAddNew = false
                             }
-                        }) { Text("Add") }
+                        },
+                            colors = ButtonDefaults.buttonColors(containerColor = ingredientGold))
+                        {
+                            Text(
+                                "Add",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            ) 
+                        }
                     },
                     dismissButton = {
                         Button(onClick = {
@@ -1305,7 +1636,14 @@ fun IngredientScreen(
                             newName = ""; newQuantity = ""; newUnit = "g"; newPrice = ""
                             newExpirationUnix = null
                             newNameError = null; newQuantityError = null; newPriceError = null
-                        }) { Text("Cancel") }
+                        },
+                            colors = ButtonDefaults.buttonColors(containerColor = ingredientGold)) {
+                            Text(
+                                "Cancel",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            ) 
+                        }
                     },
                     title = { Text("Add Ingredient") },
                     text = {

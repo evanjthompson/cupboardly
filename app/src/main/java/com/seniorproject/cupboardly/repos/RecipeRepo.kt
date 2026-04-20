@@ -1,11 +1,11 @@
-package com.seniorproject.cupboardly.classes
+package com.seniorproject.cupboardly.repos
 
 import android.content.Context
 import com.seniorproject.cupboardly.room.database.AppDatabase
 import com.seniorproject.cupboardly.room.entity.RecipeEntity
 import com.seniorproject.cupboardly.room.entity.RecipeIngredientEntity
 
-class Recipe(context: Context) {
+class RecipeRepo(context: Context) {
 
     private val db = AppDatabase.getDatabase(context)
     private val recipeDao = db.recipeDao()
@@ -50,5 +50,9 @@ class Recipe(context: Context) {
 
     suspend fun delete(recipe: RecipeEntity) {
         recipeDao.delete(recipe)
+    }
+
+    suspend fun incrementNumTimesFollowed(recipeId: Long) {
+        recipeDao.incrementNumTimesFollowed(recipeId)
     }
 }

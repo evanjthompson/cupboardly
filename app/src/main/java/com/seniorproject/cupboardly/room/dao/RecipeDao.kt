@@ -20,4 +20,7 @@ interface RecipeDao {
 
     @Query("SELECT * FROM recipe_table ORDER BY name ASC")
     suspend fun getAllRecipes(): List<RecipeEntity>
+
+    @Query("UPDATE recipe_table SET numTimesFollowed = numTimesFollowed + 1 WHERE id = :id")
+    suspend fun incrementNumTimesFollowed(id: Long)
 }
