@@ -294,7 +294,7 @@ fun RecipeScreen(
 
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var recipeToDelete by remember { mutableStateOf<Long?>(null) }
-    
+
     // Store the multiplier for each recipe when Start is clicked
     val recipeMultipliers = remember { mutableStateMapOf<Long, Double>() }
 
@@ -484,8 +484,7 @@ fun RecipeScreen(
                                     listOf(0.5, 1.0, 2.0).forEach { scale ->
                                         Button(
                                             onClick = { multiplier = scale },
-                                            enabled = !multiplier.equals(scale),
-                                            colors = if (multiplier.equals(scale))
+                                            colors = if (multiplier == scale)
                                                 ButtonDefaults.buttonColors(containerColor = recipeBlue)
                                             else
                                                 ButtonDefaults.buttonColors(containerColor = Color.LightGray),
@@ -496,7 +495,8 @@ fun RecipeScreen(
                                                 if (scale == 0.5) "0.5x" else if (scale == 1.0) "1x" else "2x",
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis,
-                                                fontSize = 12.sp
+                                                fontSize = 12.sp,
+                                                color = if (multiplier == scale) Color.White else Color.Black
                                             )
                                         }
                                     }
@@ -652,6 +652,7 @@ fun RecipeScreen(
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             OutlinedTextField(
+                                colors = darkTextFieldColors(),
                                 value = name,
                                 onValueChange = { name = it; nameError = false },
                                 label = { Text("Recipe Name") },
@@ -659,6 +660,7 @@ fun RecipeScreen(
                             )
 
                             OutlinedTextField(
+                                colors = darkTextFieldColors(),
                                 value = instructions,
                                 onValueChange = { instructions = it },
                                 label = { Text("Instructions") }
@@ -670,6 +672,7 @@ fun RecipeScreen(
 
                             Row {
                                 OutlinedTextField(
+                                    colors = darkTextFieldColors(),
                                     value = newIngredientName,
                                     onValueChange = { newIngredientName = it; ingredientError = null },
                                     label = { Text("Ingredient Name") },
@@ -735,12 +738,18 @@ fun RecipeScreen(
                                                     selectedIngredients.remove(ingredient.id)
                                                     selectedUnits.remove(ingredient.id)
                                                 }
-                                            }
+                                            },
+                                            colors = CheckboxDefaults.colors(
+                                                checkedColor = recipeBlue,
+                                                uncheckedColor = Color.Gray,
+                                                checkmarkColor = Color.White
+                                            )
                                         )
                                         Text(ingredient.name, modifier = Modifier.weight(1f))
 
                                         if (isSelected) {
                                             OutlinedTextField(
+                                                colors = darkTextFieldColors(),
                                                 value = selectedIngredients[ingredient.id] ?: "",
                                                 onValueChange = { selectedIngredients[ingredient.id] = it },
                                                 label = { Text("Qty") },
@@ -754,6 +763,7 @@ fun RecipeScreen(
                                                 modifier = Modifier.width(100.dp)
                                             ) {
                                                 OutlinedTextField(
+                                                    colors = darkTextFieldColors(),
                                                     value = selectedUnits[ingredient.id] ?: ingredient.unit.ifBlank { "g" },
                                                     onValueChange = {},
                                                     readOnly = true,
@@ -793,6 +803,7 @@ fun RecipeScreen(
                                         Spacer(modifier = Modifier.width(48.dp))
                                         Text("[NEW] " + temp.name, modifier = Modifier.weight(1f))
                                         OutlinedTextField(
+                                            colors = darkTextFieldColors(),
                                             value = temp.quantity,
                                             onValueChange = { temp.quantity = it },
                                             label = { Text("Qty") },
@@ -806,6 +817,7 @@ fun RecipeScreen(
                                             modifier = Modifier.width(100.dp)
                                         ) {
                                             OutlinedTextField(
+                                                colors = darkTextFieldColors(),
                                                 value = temp.unit,
                                                 onValueChange = {},
                                                 readOnly = true,
@@ -868,7 +880,7 @@ fun RecipeScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Camera button (moved here from the FAB dropdown)
+                        // Camera button
                         Button(
                             onClick = { launchCamera() },
                             enabled = !isLoading,
@@ -1031,6 +1043,7 @@ fun RecipeScreen(
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             OutlinedTextField(
+                                colors = darkTextFieldColors(),
                                 value = editName,
                                 onValueChange = { editName = it; editNameError = false },
                                 label = { Text("Recipe Name") },
@@ -1039,6 +1052,7 @@ fun RecipeScreen(
                             )
 
                             OutlinedTextField(
+                                colors = darkTextFieldColors(),
                                 value = editInstructions,
                                 onValueChange = { editInstructions = it },
                                 label = { Text("Instructions") },
@@ -1052,6 +1066,7 @@ fun RecipeScreen(
 
                             Row {
                                 OutlinedTextField(
+                                    colors = darkTextFieldColors(),
                                     value = newIngredientName,
                                     onValueChange = { newIngredientName = it; editIngredientError = null },
                                     label = { Text("Ingredient Name") },
@@ -1113,12 +1128,18 @@ fun RecipeScreen(
                                                     editSelectedIngredients.remove(ingredient.id)
                                                     editSelectedUnits.remove(ingredient.id)
                                                 }
-                                            }
+                                            },
+                                            colors = CheckboxDefaults.colors(
+                                                checkedColor = recipeBlue,
+                                                uncheckedColor = Color.Gray,
+                                                checkmarkColor = Color.White
+                                            )
                                         )
                                         Text(ingredient.name, modifier = Modifier.weight(1f))
 
                                         if (isSelected) {
                                             OutlinedTextField(
+                                                colors = darkTextFieldColors(),
                                                 value = editSelectedIngredients[ingredient.id] ?: "",
                                                 onValueChange = { editSelectedIngredients[ingredient.id] = it },
                                                 label = { Text("Qty") },
@@ -1132,6 +1153,7 @@ fun RecipeScreen(
                                                 modifier = Modifier.width(100.dp)
                                             ) {
                                                 OutlinedTextField(
+                                                    colors = darkTextFieldColors(),
                                                     value = editSelectedUnits[ingredient.id] ?: ingredient.unit.ifBlank { "g" },
                                                     onValueChange = {},
                                                     readOnly = true,
@@ -1171,6 +1193,7 @@ fun RecipeScreen(
                                         Spacer(modifier = Modifier.width(48.dp))
                                         Text("[NEW] " + temp.name, modifier = Modifier.weight(1f))
                                         OutlinedTextField(
+                                            colors = darkTextFieldColors(),
                                             value = temp.quantity,
                                             onValueChange = { temp.quantity = it },
                                             label = { Text("Qty") },
@@ -1184,6 +1207,7 @@ fun RecipeScreen(
                                             modifier = Modifier.width(100.dp)
                                         ) {
                                             OutlinedTextField(
+                                                colors = darkTextFieldColors(),
                                                 value = temp.unit,
                                                 onValueChange = {},
                                                 readOnly = true,
@@ -1218,21 +1242,25 @@ fun RecipeScreen(
                     confirmButton = {},
                     dismissButton = {
                         var showMoreMenu by remember { mutableStateOf(false) }
-                        
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             // Menu button
-                            Box(modifier = Modifier.weight(0.4f)) {
+                            Box(modifier = Modifier.weight(0.4f).wrapContentSize(Alignment.TopStart)) {
                                 Button(
                                     onClick = { showMoreMenu = true },
                                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                                     modifier = Modifier.fillMaxWidth(),
                                     contentPadding = PaddingValues(0.dp)
                                 ) {
-                                    Text("⌄")
+                                    Text(
+                                        "⌄",
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    )
                                 }
                                 DropdownMenu(
                                     expanded = showMoreMenu,
@@ -1398,8 +1426,10 @@ fun RecipeScreen(
                     ) { Text("Delete") }
                 },
                 dismissButton = {
-                    Button(onClick = { showDeleteConfirmDialog = false; recipeToDelete = null },
-                        colors = ButtonDefaults.buttonColors(containerColor = recipeBlue)) {
+                    Button(
+                        onClick = { showDeleteConfirmDialog = false; recipeToDelete = null },
+                        colors = ButtonDefaults.buttonColors(containerColor = recipeBlue)
+                    ) {
                         Text("Cancel")
                     }
                 }
@@ -1467,7 +1497,7 @@ fun RecipeScreen(
                         coroutineScope.launch {
                             val links = recipeViewModel.getIngredientsForRecipe(activeRecipe!!)
                             val multiplier = recipeMultipliers[activeRecipe] ?: 1.0
-                            
+
                             if (startError.isNullOrBlank()) {
                                 // Normal flow: check for sufficient ingredients
                                 val insufficient = mutableListOf<String>()
@@ -1490,14 +1520,14 @@ fun RecipeScreen(
                                     return@launch
                                 }
                             }
-                            
-                            // Deduct ingredients (either full in normal flow, or partial in "Make Anyway" flow)
+
+                            // Deduct ingredients
                             links.forEach { link ->
                                 val ingredient =
                                     ingredientViewModel.getIngredientById(link.ingredientId)
                                 if (ingredient != null) {
                                     val scaledQuantityNeeded = link.quantityUsed * multiplier
-                                    
+
                                     if (startError.isNullOrBlank()) {
                                         // Normal flow: deduct full amount
                                         deductFromBatchesFifo(
@@ -1524,7 +1554,7 @@ fun RecipeScreen(
                             showStartDialog = false
                             startError = null
                         }
-                    },colors = ButtonDefaults.buttonColors(containerColor = recipeBlue) ) {
+                    }, colors = ButtonDefaults.buttonColors(containerColor = recipeBlue)) {
                         if (startError.isNullOrBlank()) {
                             Text("Confirm & Start")
                         } else {
@@ -1533,7 +1563,8 @@ fun RecipeScreen(
                     }
                 },
                 dismissButton = {
-                    Button(onClick = { showStartDialog = false },
+                    Button(
+                        onClick = { showStartDialog = false },
                         colors = ButtonDefaults.buttonColors(containerColor = recipeBlue)
                     ) { Text("Cancel") }
                 }

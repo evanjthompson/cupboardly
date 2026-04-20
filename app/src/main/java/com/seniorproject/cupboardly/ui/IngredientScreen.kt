@@ -579,7 +579,10 @@ fun IngredientScreen(
                                     ) { Text("Delete") }
                                 },
                                 dismissButton = {
-                                    Button(onClick = { batchPendingDelete = null }) { Text("Cancel") }
+                                    Button(
+                                        onClick = { batchPendingDelete = null },
+                                        colors = ButtonDefaults.buttonColors(containerColor = ingredientGold)
+                                    ) { Text("Cancel") }
                                 }
                             )
                         }
@@ -620,7 +623,10 @@ fun IngredientScreen(
                                     ) { Text("Delete") }
                                 },
                                 dismissButton = {
-                                    Button(onClick = { showDeleteIngredientConfirm = false }) {
+                                    Button(
+                                        onClick = { showDeleteIngredientConfirm = false },
+                                        colors = ButtonDefaults.buttonColors(containerColor = ingredientGold)
+                                    ) {
                                         Text("Cancel")
                                     }
                                 }
@@ -652,7 +658,10 @@ fun IngredientScreen(
                                     ) { Text("Reset") }
                                 },
                                 dismissButton = {
-                                    Button(onClick = { showResetConfirm = false }) { Text("Cancel") }
+                                    Button(
+                                        onClick = { showResetConfirm = false },
+                                        colors = ButtonDefaults.buttonColors(containerColor = ingredientGold)
+                                    ) { Text("Cancel") }
                                 }
                             )
                         }
@@ -737,46 +746,50 @@ fun IngredientScreen(
                                     }
                                 },
                                 confirmButton = {
-                                    Button(onClick = {
-                                        val quantityValue = useSomeQuantity.toDoubleOrNull()
-                                        var valid = true
+                                    Button(
+                                        onClick = {
+                                            val quantityValue = useSomeQuantity.toDoubleOrNull()
+                                            var valid = true
 
-                                        if (quantityValue == null || quantityValue <= 0) {
-                                            useSomeError = "Quantity must be > 0"
-                                            valid = false
-                                        }
-
-                                        if (valid) {
-                                            scope.launch {
-                                                deductFromBatchesFifo(
-                                                    ingredient.id,
-                                                    quantityValue!!,
-                                                    useSomeUnit,
-                                                    ingredient.density,
-                                                    viewModel
-                                                )
-                                                viewModel.refresh()
-                                                showUseSomeDialog = false
-                                                useSomeQuantity = ""
-                                                useSomeError = null
+                                            if (quantityValue == null || quantityValue <= 0) {
+                                                useSomeError = "Quantity must be > 0"
+                                                valid = false
                                             }
-                                        }
-                                    }) { 
+
+                                            if (valid) {
+                                                scope.launch {
+                                                    deductFromBatchesFifo(
+                                                        ingredient.id,
+                                                        quantityValue!!,
+                                                        useSomeUnit,
+                                                        ingredient.density,
+                                                        viewModel
+                                                    )
+                                                    viewModel.refresh()
+                                                    showUseSomeDialog = false
+                                                    useSomeQuantity = ""
+                                                    useSomeError = null
+                                                }
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = ingredientGold)
+                                    ) {
                                         Text(
                                             "Use",
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
-                                        ) 
+                                        )
                                     }
                                 },
                                 dismissButton = {
                                     Button(
-                                        onClick = { 
+                                        onClick = {
                                             showUseSomeDialog = false
                                             useSomeQuantity = ""
                                             useSomeError = null
-                                        }
-                                    ) { 
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = ingredientGold)
+                                    ) {
                                         Text(
                                             "Cancel",
                                             maxLines = 1,
@@ -1249,7 +1262,7 @@ fun IngredientScreen(
                                                                         modifier = Modifier.weight(1f)
                                                                     ) { Text("Save") }
 
-                                                                    // Delete batch — now shows confirmation dialog
+                                                                    // Delete batch — shows confirmation dialog
                                                                     Button(
                                                                         onClick = {
                                                                             batchPendingDelete = batch
@@ -1363,18 +1376,18 @@ fun IngredientScreen(
                                                 ) { Text("Save") }
 
                                                 var showMoreMenu by remember { mutableStateOf(false) }
-                                                Box(modifier = Modifier.weight(0.4f)) {
+                                                Box(modifier = Modifier.weight(0.4f).wrapContentSize(Alignment.TopStart)) {
                                                     Button(
                                                         onClick = { showMoreMenu = true },
                                                         colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
-                                                        modifier = Modifier.fillMaxWidth()
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        contentPadding = PaddingValues(0.dp)
                                                     ) {
-                                                        Box(
+                                                        Text(
+                                                            text = "⌄",
                                                             modifier = Modifier.fillMaxWidth(),
-                                                            contentAlignment = Alignment.Center
-                                                        ) {
-                                                            Text("⌄")
-                                                        }
+                                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                                        )
                                                     }
                                                     DropdownMenu(
                                                         expanded = showMoreMenu,
@@ -1481,24 +1494,24 @@ fun IngredientScreen(
                                                     },
                                                     colors = ButtonDefaults.buttonColors(containerColor = ingredientGold),
                                                     modifier = Modifier.weight(1f)
-                                                ) { 
+                                                ) {
                                                     Text(
                                                         "Add +",
                                                         maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis
-                                                    ) 
+                                                    )
                                                 }
 
                                                 Button(
                                                     onClick = { showUseSomeDialog = true; useSomeQuantity = ""; useSomeError = null },
                                                     colors = ButtonDefaults.buttonColors(containerColor = ingredientGold),
                                                     modifier = Modifier.weight(1f)
-                                                ) { 
+                                                ) {
                                                     Text(
                                                         "Use -",
                                                         maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis
-                                                    ) 
+                                                    )
                                                 }
 
                                                 Button(
@@ -1512,12 +1525,12 @@ fun IngredientScreen(
                                                     },
                                                     colors = ButtonDefaults.buttonColors(containerColor = ingredientGold),
                                                     modifier = Modifier.weight(1f)
-                                                ) { 
+                                                ) {
                                                     Text(
                                                         "Edit",
                                                         maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis
-                                                    ) 
+                                                    )
                                                 }
                                             }
                                         }
@@ -1627,7 +1640,7 @@ fun IngredientScreen(
                                 "Add",
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
-                            ) 
+                            )
                         }
                     },
                     dismissButton = {
@@ -1642,7 +1655,7 @@ fun IngredientScreen(
                                 "Cancel",
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
-                            ) 
+                            )
                         }
                     },
                     title = { Text("Add Ingredient") },
