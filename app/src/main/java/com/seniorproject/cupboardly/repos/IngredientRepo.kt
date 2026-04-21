@@ -1,11 +1,11 @@
-package com.seniorproject.cupboardly.classes
+package com.seniorproject.cupboardly.repos
 
 import android.content.Context
 import com.seniorproject.cupboardly.room.database.AppDatabase
 import com.seniorproject.cupboardly.room.entity.IngredientBatchEntity
 import com.seniorproject.cupboardly.room.entity.IngredientEntity
 
-class Ingredient(context: Context) {
+class IngredientRepo(context: Context) {
 
     private val db = AppDatabase.getDatabase(context)
     private val ingredientDao = db.ingredientDao()
@@ -110,7 +110,7 @@ class Ingredient(context: Context) {
     suspend fun resetBatches(ingredientId: Long) {
         val batches = batchDao.getBatchesForIngredient(ingredientId)
         batches.forEach { batch ->
-            batchDao.update(batch.copy(quantity = 0.0, price = 0.0))
+            batchDao.delete(batch)
         }
     }
 

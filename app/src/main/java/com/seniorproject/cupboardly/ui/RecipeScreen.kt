@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.*
@@ -23,6 +24,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.seniorproject.cupboardly.R
 import com.seniorproject.cupboardly.classes.askGeminiForDensity
@@ -51,7 +54,9 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.text.style.TextOverflow
 import com.seniorproject.cupboardly.classes.askGeminiForRecipeParse
+import com.seniorproject.cupboardly.room.dao.RecipeDao
 import com.seniorproject.cupboardly.room.entity.RecipeIngredientEntity
 
 // ---------------------------------------------------------------------------
@@ -82,6 +87,21 @@ suspend fun processPhotoUri(context: Context, photoUri: Uri?): String? {
         Log.e("MLKit", "Failed to process image", e)
         null
     }
+}
+
+/**
+ * Calculate the cost per gram for an ingredient based on its batches.
+ * Returns: total price of all batches / total quantity in grams
+ */
+suspend fun calculateCostPerGram(
+    ingredientId: Long,
+    ingredientViewModel: IngredientViewModel
+): Double {
+    val batches = ingredientViewModel.getBatchesForIngredient(ingredientId)
+    val totalPrice = batches.sumOf { it.price }
+    val totalQuantityGrams = batches.sumOf { it.quantity }
+
+    return if (totalQuantityGrams > 0.0) totalPrice / totalQuantityGrams else 0.0
 }
 
 /**
@@ -138,10 +158,11 @@ class TempIngredient(
 
 @Composable
 fun RecipeScreen(
+    currentScreen: String,
     recipeViewModel: RecipeViewModel = viewModel(),
     ingredientViewModel: IngredientViewModel = viewModel(),
     onGoToIngredients: () -> Unit,
-    onGoToSettings: () -> Unit
+    onGoToManageData: () -> Unit
 ){
     var hasCameraPermission by remember { mutableStateOf(false) }
 
@@ -149,8 +170,19 @@ fun RecipeScreen(
     val allIngredients by ingredientViewModel.ingredients.collectAsState()
 
     val coroutineScope = rememberCoroutineScope()
-    val sdf = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
+    val sdf = SimpleDateFormat("MMM dd, yyyy hh:mm a", Locale.getDefault())
     val recipeIngredientsMap = remember { mutableStateMapOf<Long, String>() }
+
+    // store detailed ingredient info and recipe costs
+    data class RecipeIngredientDetail(
+        val name: String,
+        val quantity: Double,
+        val unit: String,
+        val cost: Double
+    )
+    val recipeIngredientsDetailMap = remember { mutableStateMapOf<Long, List<RecipeIngredientDetail>>() }
+    val recipeTotalCostMap = remember { mutableStateMapOf<Long, Double>() }
+
     val context = LocalContext.current
 
     var photoUri by remember { mutableStateOf<Uri?>(null) }
@@ -171,6 +203,9 @@ fun RecipeScreen(
     // Edit dialog state
     var showEditDialog by remember { mutableStateOf(false) }
     var editingRecipeId by remember { mutableStateOf<Long?>(null) }
+
+    // Search state
+    var searchQuery by remember { mutableStateOf("") }
 
     // Camera launcher — can be triggered from inside the Add dialog too
     val cameraLauncher = rememberLauncherForActivityResult(
@@ -257,15 +292,20 @@ fun RecipeScreen(
     var startError by remember { mutableStateOf<String?>(null) }
     var startDialogIngredientInfo by remember { mutableStateOf<List<String>>(emptyList()) }
 
-    var showOverrideConfirmDialog by remember { mutableStateOf(false) }
-    var showDeleteDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var recipeToDelete by remember { mutableStateOf<Long?>(null) }
+
+    // Store the multiplier for each recipe when Start is clicked
+    val recipeMultipliers = remember { mutableStateMapOf<Long, Double>() }
 
     LaunchedEffect(recipes) {
         recipes.forEach { recipe ->
-            if (!recipeIngredientsMap.containsKey(recipe.id)) {
+            if (!recipeIngredientsDetailMap.containsKey(recipe.id)) {
                 val links = recipeViewModel.getIngredientsForRecipe(recipe.id)
-                val ingredientsWithQuantities = links.mapNotNull { link ->
+                val ingredientDetails = mutableListOf<RecipeIngredientDetail>()
+                var totalRecipeCost = 0.0
+
+                links.forEach { link ->
                     val ingredient = ingredientViewModel.getIngredientById(link.ingredientId)
                     ingredient?.let {
                         val displayQty = ingredientViewModel.convertFromGrams(
@@ -273,8 +313,29 @@ fun RecipeScreen(
                             link.unitUsed,
                             it.density
                         )
-                        "${formatDouble(displayQty)} ${link.unitUsed} ${it.name}"
+
+                        // Calculate cost for this ingredient in the recipe
+                        val costPerGram = calculateCostPerGram(link.ingredientId, ingredientViewModel)
+                        val ingredientCost = link.quantityUsed * costPerGram
+
+                        ingredientDetails.add(
+                            RecipeIngredientDetail(
+                                name = it.name,
+                                quantity = displayQty,
+                                unit = link.unitUsed,
+                                cost = ingredientCost
+                            )
+                        )
+                        totalRecipeCost += ingredientCost
                     }
+                }
+
+                recipeIngredientsDetailMap[recipe.id] = ingredientDetails
+                recipeTotalCostMap[recipe.id] = totalRecipeCost
+
+                // Also keep the old map for backward compatibility if needed
+                val ingredientsWithQuantities = ingredientDetails.map {
+                    "${formatDouble(it.quantity)} ${it.unit} ${it.name}"
                 }
                 recipeIngredientsMap[recipe.id] = ingredientsWithQuantities.joinToString(", ")
             }
@@ -293,8 +354,8 @@ fun RecipeScreen(
         }
     }
 
-    val ingredientGold = Color(197, 145, 39)
-    val recipeBlue = Color(11, 186, 224)
+    val ingredientGold = Color(162, 119, 0)
+    val recipeBlue = Color(91, 177, 184)
 
     Box(
         modifier = Modifier
@@ -314,51 +375,83 @@ fun RecipeScreen(
                 .fillMaxSize()
                 .padding(16.dp)
         ) {
+            // Ingredients + Recipes nav buttons
+            TopNavTabs(
+                currentScreen = currentScreen,
+                onGoToIngredients = onGoToIngredients,
+                onGoToRecipes = {}, // already here
+                ingredientGold = ingredientGold,
+                recipeBlue = recipeBlue
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        color = Color(0x22000000), // shared translucent background
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    .padding(horizontal = 6.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
+
+                // Search field
+                OutlinedTextField(
+                    colors = darkTextFieldColors(),
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    label = { Text("Search recipes") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Search
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 56.dp)
+                )
+
+                // Manage data button
                 Button(
-                    onClick = onGoToIngredients,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = ingredientGold,
-                        contentColor = Color.White
-                    )
-                ) {
-                    AutoSizeText(
-                        text = "Ingredients",
-                        maxFontSize = 16.sp,
-                        minFontSize = 8.sp,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                Button(
-                    onClick = {},
-                    modifier = Modifier.weight(2f),
-                    colors = ButtonDefaults.buttonColors(containerColor = recipeBlue)
-                ) {
-                    Text("Recipes", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                }
-                Button(
-                    onClick = onGoToSettings,
-                    modifier = Modifier.weight(.75f),
+                    onClick = onGoToManageData,
+                    modifier = Modifier.size(50.dp),
+                    shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color.DarkGray,
                         contentColor = Color.White
-                    )
+                    ),
+                    contentPadding = PaddingValues(0.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.FolderCopy,
-                        contentDescription = "Settings"
+                        contentDescription = "Manage Data"
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Filter recipes by search query
+            val filteredRecipes = remember(recipes, searchQuery) {
+                if (searchQuery.isBlank()) recipes
+                else recipes.filter {
+                    it.name.contains(searchQuery.trim(), ignoreCase = true)
+                }
+            }
+
+            if (filteredRecipes.isEmpty()) {
+                Text(
+                    if (searchQuery.isBlank()) "No recipes yet"
+                    else "No recipes match \"$searchQuery\""
+                )
+            }
 
             LazyColumn {
-                items(recipes, key = { it.id }) { recipe ->
+                items(filteredRecipes, key = { it.id }) { recipe ->
 
                     var expanded by remember(recipe.id) { mutableStateOf(false) }
                     val ingredientText = recipeIngredientsMap[recipe.id] ?: "Loading..."
@@ -379,7 +472,70 @@ fun RecipeScreen(
 
                             if (expanded) {
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Text("Ingredients: $ingredientText")
+
+                                // Recipe multiplier controls
+                                var multiplier by remember { mutableStateOf(1.0) }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Scale:", fontWeight = FontWeight.SemiBold, modifier = Modifier.width(50.dp))
+                                    listOf(0.5, 1.0, 2.0).forEach { scale ->
+                                        Button(
+                                            onClick = { multiplier = scale },
+                                            colors = if (multiplier == scale)
+                                                ButtonDefaults.buttonColors(containerColor = recipeBlue)
+                                            else
+                                                ButtonDefaults.buttonColors(containerColor = Color.LightGray),
+                                            modifier = Modifier.weight(1f),
+                                            contentPadding = PaddingValues(4.dp)
+                                        ) {
+                                            Text(
+                                                if (scale == 0.5) "0.5x" else if (scale == 1.0) "1x" else "2x",
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                fontSize = 12.sp,
+                                                color = if (multiplier == scale) Color.White else Color.Black
+                                            )
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // Display ingredients with costs
+                                val ingredientDetails = recipeIngredientsDetailMap[recipe.id] ?: emptyList()
+                                if (ingredientDetails.isNotEmpty()) {
+                                    Text("Ingredients:", fontWeight = FontWeight.Bold)
+                                    ingredientDetails.forEach { detail ->
+                                        val scaledQuantity = detail.quantity * multiplier
+                                        val scaledCost = detail.cost * multiplier
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text("${formatDouble(scaledQuantity)} ${detail.unit} ${detail.name}")
+                                            Text("$${formatDouble(scaledCost)}")
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Divider()
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("Total Recipe Cost:", fontWeight = FontWeight.SemiBold)
+                                        val scaledTotalCost = (recipeTotalCostMap[recipe.id] ?: 0.0) * multiplier
+                                        Text("$${formatDouble(scaledTotalCost)}", fontWeight = FontWeight.SemiBold)
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                } else {
+                                    Text("Ingredients: $ingredientText")
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                }
+
                                 Text("Instructions: ${recipe.instructions}")
                                 Text("Date Created: ${sdf.format(Date(recipe.dateCreated * 1000L))}")
                                 Text("Times Followed: ${recipe.numTimesFollowed}")
@@ -393,6 +549,7 @@ fun RecipeScreen(
                                     Button(
                                         onClick = {
                                             activeRecipe = recipe.id
+                                            recipeMultipliers[recipe.id] = multiplier
                                             startError = null
                                             startDialogIngredientInfo = emptyList()
                                             showStartDialog = true
@@ -401,17 +558,6 @@ fun RecipeScreen(
                                         modifier = Modifier.weight(1f)
                                     ) {
                                         Text("Start")
-                                    }
-
-                                    Button(
-                                        onClick = {
-                                            recipeToDelete = recipe.id
-                                            showDeleteDialog = true
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Text("Delete")
                                     }
 
                                     Button(
@@ -432,7 +578,6 @@ fun RecipeScreen(
             }
         }
 
-        // FAB — single tap opens Add Recipe dialog directly (no dropdown)
         Button(
             onClick = {
                 prefillName = ""
@@ -507,6 +652,7 @@ fun RecipeScreen(
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             OutlinedTextField(
+                                colors = darkTextFieldColors(),
                                 value = name,
                                 onValueChange = { name = it; nameError = false },
                                 label = { Text("Recipe Name") },
@@ -514,6 +660,7 @@ fun RecipeScreen(
                             )
 
                             OutlinedTextField(
+                                colors = darkTextFieldColors(),
                                 value = instructions,
                                 onValueChange = { instructions = it },
                                 label = { Text("Instructions") }
@@ -525,6 +672,7 @@ fun RecipeScreen(
 
                             Row {
                                 OutlinedTextField(
+                                    colors = darkTextFieldColors(),
                                     value = newIngredientName,
                                     onValueChange = { newIngredientName = it; ingredientError = null },
                                     label = { Text("Ingredient Name") },
@@ -552,7 +700,8 @@ fun RecipeScreen(
                                         tempIngredients.add(TempIngredient(trimmedName))
                                         newIngredientName = ""
                                     }
-                                }) {
+                                },
+                                    colors = ButtonDefaults.buttonColors(containerColor = recipeBlue) ) {
                                     Text("Add")
                                 }
                             }
@@ -589,12 +738,18 @@ fun RecipeScreen(
                                                     selectedIngredients.remove(ingredient.id)
                                                     selectedUnits.remove(ingredient.id)
                                                 }
-                                            }
+                                            },
+                                            colors = CheckboxDefaults.colors(
+                                                checkedColor = recipeBlue,
+                                                uncheckedColor = Color.Gray,
+                                                checkmarkColor = Color.White
+                                            )
                                         )
                                         Text(ingredient.name, modifier = Modifier.weight(1f))
 
                                         if (isSelected) {
                                             OutlinedTextField(
+                                                colors = darkTextFieldColors(),
                                                 value = selectedIngredients[ingredient.id] ?: "",
                                                 onValueChange = { selectedIngredients[ingredient.id] = it },
                                                 label = { Text("Qty") },
@@ -608,6 +763,7 @@ fun RecipeScreen(
                                                 modifier = Modifier.width(100.dp)
                                             ) {
                                                 OutlinedTextField(
+                                                    colors = darkTextFieldColors(),
                                                     value = selectedUnits[ingredient.id] ?: ingredient.unit.ifBlank { "g" },
                                                     onValueChange = {},
                                                     readOnly = true,
@@ -647,6 +803,7 @@ fun RecipeScreen(
                                         Spacer(modifier = Modifier.width(48.dp))
                                         Text("[NEW] " + temp.name, modifier = Modifier.weight(1f))
                                         OutlinedTextField(
+                                            colors = darkTextFieldColors(),
                                             value = temp.quantity,
                                             onValueChange = { temp.quantity = it },
                                             label = { Text("Qty") },
@@ -660,6 +817,7 @@ fun RecipeScreen(
                                             modifier = Modifier.width(100.dp)
                                         ) {
                                             OutlinedTextField(
+                                                colors = darkTextFieldColors(),
                                                 value = temp.unit,
                                                 onValueChange = {},
                                                 readOnly = true,
@@ -722,7 +880,7 @@ fun RecipeScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Camera button (moved here from the FAB dropdown)
+                        // Camera button
                         Button(
                             onClick = { launchCamera() },
                             enabled = !isLoading,
@@ -739,7 +897,8 @@ fun RecipeScreen(
 
                         Button(
                             onClick = { showAddDialog = false },
-                            enabled = !isLoading
+                            enabled = !isLoading,
+                            colors = ButtonDefaults.buttonColors(containerColor = recipeBlue)
                         ) { Text("Cancel") }
 
                         Button(
@@ -810,8 +969,15 @@ fun RecipeScreen(
                                     loadingMessage = ""
                                 }
                             },
-                            enabled = !isLoading
-                        ) { Text("Save") }
+                            enabled = !isLoading,
+                            colors = ButtonDefaults.buttonColors(containerColor = recipeBlue)
+                        ){
+                            Text(
+                                "Save",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 },
                 // dismissButton is intentionally empty — buttons are all in confirmButton row
@@ -877,6 +1043,7 @@ fun RecipeScreen(
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             OutlinedTextField(
+                                colors = darkTextFieldColors(),
                                 value = editName,
                                 onValueChange = { editName = it; editNameError = false },
                                 label = { Text("Recipe Name") },
@@ -885,6 +1052,7 @@ fun RecipeScreen(
                             )
 
                             OutlinedTextField(
+                                colors = darkTextFieldColors(),
                                 value = editInstructions,
                                 onValueChange = { editInstructions = it },
                                 label = { Text("Instructions") },
@@ -898,6 +1066,7 @@ fun RecipeScreen(
 
                             Row {
                                 OutlinedTextField(
+                                    colors = darkTextFieldColors(),
                                     value = newIngredientName,
                                     onValueChange = { newIngredientName = it; editIngredientError = null },
                                     label = { Text("Ingredient Name") },
@@ -921,7 +1090,8 @@ fun RecipeScreen(
                                         editTempIngredients.add(TempIngredient(trimmedName))
                                         newIngredientName = ""
                                     }
-                                }) {
+                                },
+                                    colors = ButtonDefaults.buttonColors(containerColor = recipeBlue)) {
                                     Text("Add")
                                 }
                             }
@@ -958,12 +1128,18 @@ fun RecipeScreen(
                                                     editSelectedIngredients.remove(ingredient.id)
                                                     editSelectedUnits.remove(ingredient.id)
                                                 }
-                                            }
+                                            },
+                                            colors = CheckboxDefaults.colors(
+                                                checkedColor = recipeBlue,
+                                                uncheckedColor = Color.Gray,
+                                                checkmarkColor = Color.White
+                                            )
                                         )
                                         Text(ingredient.name, modifier = Modifier.weight(1f))
 
                                         if (isSelected) {
                                             OutlinedTextField(
+                                                colors = darkTextFieldColors(),
                                                 value = editSelectedIngredients[ingredient.id] ?: "",
                                                 onValueChange = { editSelectedIngredients[ingredient.id] = it },
                                                 label = { Text("Qty") },
@@ -977,6 +1153,7 @@ fun RecipeScreen(
                                                 modifier = Modifier.width(100.dp)
                                             ) {
                                                 OutlinedTextField(
+                                                    colors = darkTextFieldColors(),
                                                     value = editSelectedUnits[ingredient.id] ?: ingredient.unit.ifBlank { "g" },
                                                     onValueChange = {},
                                                     readOnly = true,
@@ -1016,6 +1193,7 @@ fun RecipeScreen(
                                         Spacer(modifier = Modifier.width(48.dp))
                                         Text("[NEW] " + temp.name, modifier = Modifier.weight(1f))
                                         OutlinedTextField(
+                                            colors = darkTextFieldColors(),
                                             value = temp.quantity,
                                             onValueChange = { temp.quantity = it },
                                             label = { Text("Qty") },
@@ -1029,6 +1207,7 @@ fun RecipeScreen(
                                             modifier = Modifier.width(100.dp)
                                         ) {
                                             OutlinedTextField(
+                                                colors = darkTextFieldColors(),
                                                 value = temp.unit,
                                                 onValueChange = {},
                                                 readOnly = true,
@@ -1060,119 +1239,173 @@ fun RecipeScreen(
                             }
                         }
                     },
-                    confirmButton = {
-                        Button(
-                            onClick = {
-                                if (editName.isBlank()) { editNameError = true; return@Button }
+                    confirmButton = {},
+                    dismissButton = {
+                        var showMoreMenu by remember { mutableStateOf(false) }
 
-                                coroutineScope.launch {
-                                    isSaving = true
-
-                                    recipeViewModel.updateRecipe(
-                                        recipe.copy(
-                                            name = editName.trim(),
-                                            instructions = editInstructions.trim()
-                                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Menu button
+                            Box(modifier = Modifier.weight(0.4f).wrapContentSize(Alignment.TopStart)) {
+                                Button(
+                                    onClick = { showMoreMenu = true },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                                    modifier = Modifier.fillMaxWidth(),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Text(
+                                        "⌄",
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                     )
+                                }
+                                DropdownMenu(
+                                    expanded = showMoreMenu,
+                                    onDismissRequest = { showMoreMenu = false },
+                                    containerColor = Color.White
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Delete", color = Color.Red) },
+                                        onClick = {
+                                            showMoreMenu = false
+                                            recipeToDelete = recipe.id
+                                            showDeleteConfirmDialog = true
+                                        }
+                                    )
+                                }
+                            }
 
-                                    val newLinks = mutableListOf<RecipeIngredientEntity>()
+                            Button(
+                                onClick = {
+                                    showEditDialog = false
+                                    editingRecipeId = null
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = recipeBlue),
+                                enabled = !isSaving,
+                                modifier = Modifier.weight(1f)
+                            ){
+                                Text(
+                                    "Cancel",
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
 
-                                    editSelectedIngredients.forEach { (id, qtyString) ->
-                                        val qty = qtyString.toDoubleOrNull() ?: 0.0
-                                        if (qty > 0) {
-                                            val ingredientEntity = allIngredients
-                                                .find { it.ingredient.id == id }?.ingredient
-                                            val selectedUnit = editSelectedUnits[id]
-                                                ?: ingredientEntity?.unit ?: "g"
-                                            val gramsToStore = ingredientViewModel.convertToGrams(
-                                                qty, selectedUnit, ingredientEntity?.density
+                            Button(
+                                onClick = {
+                                    if (editName.isBlank()) { editNameError = true; return@Button }
+
+                                    coroutineScope.launch {
+                                        isSaving = true
+
+                                        recipeViewModel.updateRecipe(
+                                            recipe.copy(
+                                                name = editName.trim(),
+                                                instructions = editInstructions.trim()
                                             )
+                                        )
+
+                                        val newLinks = mutableListOf<RecipeIngredientEntity>()
+
+                                        editSelectedIngredients.forEach { (id, qtyString) ->
+                                            val qty = qtyString.toDoubleOrNull() ?: 0.0
+                                            if (qty > 0) {
+                                                val ingredientEntity = allIngredients
+                                                    .find { it.ingredient.id == id }?.ingredient
+                                                val selectedUnit = editSelectedUnits[id]
+                                                    ?: ingredientEntity?.unit ?: "g"
+                                                val gramsToStore = ingredientViewModel.convertToGrams(
+                                                    qty, selectedUnit, ingredientEntity?.density
+                                                )
+                                                newLinks.add(
+                                                    RecipeIngredientEntity(
+                                                        recipeId = recipe.id,
+                                                        ingredientId = id,
+                                                        quantityUsed = gramsToStore,
+                                                        unitUsed = selectedUnit
+                                                    )
+                                                )
+                                            }
+                                        }
+
+                                        editTempIngredients.forEach { temp ->
+                                            val existing = ingredientViewModel.getIngredientByName(temp.name)
+                                            val targetId: Long
+                                            val targetDensity: Double?
+
+                                            if (existing != null) {
+                                                targetId = existing.id
+                                                targetDensity = existing.density
+                                            } else {
+                                                val densityValue = askGeminiForDensity(temp.name)
+                                                targetId = ingredientViewModel.addIngredientAndReturnId(
+                                                    name = temp.name,
+                                                    unit = temp.unit,
+                                                    density = densityValue
+                                                )
+                                                targetDensity = densityValue
+                                            }
+
+                                            val qty = temp.quantity.toDoubleOrNull() ?: 0.0
+                                            val grams = ingredientViewModel.convertToGrams(qty, temp.unit, targetDensity)
                                             newLinks.add(
                                                 RecipeIngredientEntity(
                                                     recipeId = recipe.id,
-                                                    ingredientId = id,
-                                                    quantityUsed = gramsToStore,
-                                                    unitUsed = selectedUnit
+                                                    ingredientId = targetId,
+                                                    quantityUsed = grams,
+                                                    unitUsed = temp.unit
                                                 )
                                             )
                                         }
+
+                                        recipeViewModel.replaceIngredientsForRecipe(recipe.id, newLinks)
+                                        recipeIngredientsMap.remove(recipe.id)
+                                        recipeIngredientsDetailMap.remove(recipe.id)
+                                        recipeTotalCostMap.remove(recipe.id)
+
+                                        recipeViewModel.refresh()
+                                        isSaving = false
+                                        showEditDialog = false
+                                        editingRecipeId = null
                                     }
-
-                                    editTempIngredients.forEach { temp ->
-                                        val existing = ingredientViewModel.getIngredientByName(temp.name)
-                                        val targetId: Long
-                                        val targetDensity: Double?
-
-                                        if (existing != null) {
-                                            targetId = existing.id
-                                            targetDensity = existing.density
-                                        } else {
-                                            val densityValue = askGeminiForDensity(temp.name)
-                                            targetId = ingredientViewModel.addIngredientAndReturnId(
-                                                name = temp.name,
-                                                unit = temp.unit,
-                                                density = densityValue
-                                            )
-                                            targetDensity = densityValue
-                                        }
-
-                                        val qty = temp.quantity.toDoubleOrNull() ?: 0.0
-                                        val grams = ingredientViewModel.convertToGrams(qty, temp.unit, targetDensity)
-                                        newLinks.add(
-                                            RecipeIngredientEntity(
-                                                recipeId = recipe.id,
-                                                ingredientId = targetId,
-                                                quantityUsed = grams,
-                                                unitUsed = temp.unit
-                                            )
-                                        )
-                                    }
-
-                                    recipeViewModel.replaceIngredientsForRecipe(recipe.id, newLinks)
-                                    recipeIngredientsMap.remove(recipe.id)
-
-                                    recipeViewModel.refresh()
-                                    isSaving = false
-                                    showEditDialog = false
-                                    editingRecipeId = null
+                                },
+                                enabled = !isSaving,
+                                colors = ButtonDefaults.buttonColors(containerColor = recipeBlue),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                if (isSaving) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                        color = Color.White
+                                    )
+                                } else {
+                                    Text(
+                                        "Save",
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                 }
-                            },
-                            enabled = !isSaving
-                        ) {
-                            if (isSaving) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
-                                    strokeWidth = 2.dp,
-                                    color = Color.White
-                                )
-                            } else {
-                                Text("Save")
                             }
                         }
-                    },
-                    dismissButton = {
-                        Button(
-                            onClick = {
-                                showEditDialog = false
-                                editingRecipeId = null
-                            },
-                            enabled = !isSaving
-                        ) { Text("Cancel") }
                     }
                 )
             }
         }
 
-        // ---------------- DELETE RECIPE DIALOG ----------------
+        // ---------------- DELETE RECIPE CONFIRMATION DIALOG ----------------
 
-        if (showDeleteDialog && recipeToDelete != null) {
+        if (showDeleteConfirmDialog && recipeToDelete != null) {
             val recipeName = recipes.find { it.id == recipeToDelete }?.name ?: ""
 
             AlertDialog(
                 containerColor = Color.White,
                 titleContentColor = Color.Black,
                 textContentColor = Color.Black,
-                onDismissRequest = { showDeleteDialog = false },
+                onDismissRequest = { showDeleteConfirmDialog = false },
                 title = { Text("Delete Recipe") },
                 text = { Text("Delete \"$recipeName\"? This cannot be undone.") },
                 confirmButton = {
@@ -1181,7 +1414,9 @@ fun RecipeScreen(
                             coroutineScope.launch {
                                 recipeViewModel.deleteRecipeWithIngredients(recipeToDelete!!)
                                 recipeIngredientsMap.remove(recipeToDelete)
-                                showDeleteDialog = false
+                                recipeIngredientsDetailMap.remove(recipeToDelete)
+                                recipeTotalCostMap.remove(recipeToDelete)
+                                showDeleteConfirmDialog = false
                                 showEditDialog = false
                                 editingRecipeId = null
                                 recipeToDelete = null
@@ -1191,7 +1426,10 @@ fun RecipeScreen(
                     ) { Text("Delete") }
                 },
                 dismissButton = {
-                    Button(onClick = { showDeleteDialog = false; recipeToDelete = null }) {
+                    Button(
+                        onClick = { showDeleteConfirmDialog = false; recipeToDelete = null },
+                        colors = ButtonDefaults.buttonColors(containerColor = recipeBlue)
+                    ) {
                         Text("Cancel")
                     }
                 }
@@ -1206,15 +1444,17 @@ fun RecipeScreen(
 
             LaunchedEffect(activeRecipe) {
                 val links = recipeViewModel.getIngredientsForRecipe(activeRecipe!!)
+                val multiplier = recipeMultipliers[activeRecipe] ?: 1.0
                 startDialogIngredientInfo = links.mapNotNull { link ->
                     val ingredient = ingredientViewModel.getIngredientById(link.ingredientId)
                     ingredient?.let {
                         val totalGrams = ingredientViewModel.getTotalQuantity(it.id)
+                        val scaledQuantityUsed = link.quantityUsed * multiplier
 
                         val usedDisplay = ingredientViewModel.convertFromGrams(
-                            link.quantityUsed, link.unitUsed, it.density
+                            scaledQuantityUsed, link.unitUsed, it.density
                         )
-                        val remainingGrams = (totalGrams - link.quantityUsed).coerceAtLeast(0.0)
+                        val remainingGrams = (totalGrams - scaledQuantityUsed).coerceAtLeast(0.0)
                         val afterDisplay = ingredientViewModel.convertFromGrams(
                             remainingGrams, link.unitUsed, it.density
                         )
@@ -1253,10 +1493,13 @@ fun RecipeScreen(
                     }
                 },
                 confirmButton = {
-                    Column {
-                        Button(onClick = {
-                            coroutineScope.launch {
-                                val links = recipeViewModel.getIngredientsForRecipe(activeRecipe!!)
+                    Button(onClick = {
+                        coroutineScope.launch {
+                            val links = recipeViewModel.getIngredientsForRecipe(activeRecipe!!)
+                            val multiplier = recipeMultipliers[activeRecipe] ?: 1.0
+
+                            if (startError.isNullOrBlank()) {
+                                // Normal flow: check for sufficient ingredients
                                 val insufficient = mutableListOf<String>()
 
                                 links.forEach { link ->
@@ -1265,7 +1508,8 @@ fun RecipeScreen(
                                     if (ingredient != null) {
                                         val totalGrams =
                                             ingredientViewModel.getTotalQuantity(ingredient.id)
-                                        if (totalGrams < link.quantityUsed) {
+                                        val scaledQuantityNeeded = link.quantityUsed * multiplier
+                                        if (totalGrams < scaledQuantityNeeded) {
                                             insufficient.add(ingredient.name)
                                         }
                                     }
@@ -1275,87 +1519,54 @@ fun RecipeScreen(
                                     startError = "Not enough: ${insufficient.joinToString(", ")}"
                                     return@launch
                                 }
-
-                                links.forEach { link ->
-                                    val ingredient =
-                                        ingredientViewModel.getIngredientById(link.ingredientId)
-                                    if (ingredient != null) {
-                                        deductFromBatchesFifo(
-                                            ingredientId = ingredient.id,
-                                            gramsNeeded = link.quantityUsed,
-                                            ingredientViewModel = ingredientViewModel
-                                        )
-                                    }
-                                }
-
-                                showStartDialog = false
                             }
-                        }) {
-                            Text("Confirm & Start")
-                        }
 
-                        if (!startError.isNullOrBlank()) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Button(
-                                onClick = { showOverrideConfirmDialog = true },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
-                            ) {
-                                Text("Make Anyway")
-                            }
-                        }
-                    }
-                },
-                dismissButton = {
-                    Button(onClick = { showStartDialog = false }) { Text("Cancel") }
-                }
-            )
-        }
-
-        // ---------------- OVERRIDE CONFIRM DIALOG ----------------
-
-        if (showOverrideConfirmDialog && activeRecipe != null) {
-
-            AlertDialog(
-                containerColor = Color.White,
-                titleContentColor = Color.Black,
-                textContentColor = Color.Black,
-                onDismissRequest = { showOverrideConfirmDialog = false },
-                title = { Text("Are you sure?") },
-                text = {
-                    Text(
-                        "You don't have enough ingredients:\n\n${startError ?: ""}\n\nContinue anyway?"
-                    )
-                },
-                confirmButton = {
-                    Button(onClick = {
-                        coroutineScope.launch {
-                            val links = recipeViewModel.getIngredientsForRecipe(activeRecipe!!)
-
+                            // Deduct ingredients
                             links.forEach { link ->
                                 val ingredient =
                                     ingredientViewModel.getIngredientById(link.ingredientId)
                                 if (ingredient != null) {
-                                    val totalGrams =
-                                        ingredientViewModel.getTotalQuantity(ingredient.id)
-                                    val gramsToDeduct = minOf(link.quantityUsed, totalGrams)
-                                    if (gramsToDeduct > 0.0) {
+                                    val scaledQuantityNeeded = link.quantityUsed * multiplier
+
+                                    if (startError.isNullOrBlank()) {
+                                        // Normal flow: deduct full amount
                                         deductFromBatchesFifo(
                                             ingredientId = ingredient.id,
-                                            gramsNeeded = gramsToDeduct,
+                                            gramsNeeded = scaledQuantityNeeded,
                                             ingredientViewModel = ingredientViewModel
                                         )
+                                    } else {
+                                        // "Make Anyway" flow: deduct whatever is available
+                                        val totalGrams = ingredientViewModel.getTotalQuantity(ingredient.id)
+                                        val gramsToDeduct = minOf(scaledQuantityNeeded, totalGrams)
+                                        if (gramsToDeduct > 0.0) {
+                                            deductFromBatchesFifo(
+                                                ingredientId = ingredient.id,
+                                                gramsNeeded = gramsToDeduct,
+                                                ingredientViewModel = ingredientViewModel
+                                            )
+                                        }
                                     }
                                 }
                             }
 
-                            showOverrideConfirmDialog = false
+                            recipeViewModel.incrementNumTimesFollowed(activeRecipe!!)
                             showStartDialog = false
                             startError = null
                         }
-                    }) { Text("Yes, Continue") }
+                    }, colors = ButtonDefaults.buttonColors(containerColor = recipeBlue)) {
+                        if (startError.isNullOrBlank()) {
+                            Text("Confirm & Start")
+                        } else {
+                            Text("Make Anyway")
+                        }
+                    }
                 },
                 dismissButton = {
-                    Button(onClick = { showOverrideConfirmDialog = false }) { Text("Cancel") }
+                    Button(
+                        onClick = { showStartDialog = false },
+                        colors = ButtonDefaults.buttonColors(containerColor = recipeBlue)
+                    ) { Text("Cancel") }
                 }
             )
         }

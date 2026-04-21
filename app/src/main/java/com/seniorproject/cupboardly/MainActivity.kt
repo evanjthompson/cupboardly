@@ -24,16 +24,19 @@ class MainActivity : ComponentActivity() {
 
                 when (currentScreen) {
                     "ingredients" -> IngredientScreen(
+                        currentScreen = currentScreen,
                         onGoToRecipes = { currentScreen = "recipes" },
-                        onGoToSettings = { currentScreen = "settings" }
+                        onGoToManageData = { currentScreen = "settings" }
                     )
 
                     "recipes" -> RecipeScreen(
+                        currentScreen = currentScreen,
                         onGoToIngredients = { currentScreen = "ingredients" },
-                        onGoToSettings = { currentScreen = "settings" }
+                        onGoToManageData = { currentScreen = "settings" }
                     )
 
                     "settings" -> SettingsScreen(
+                        currentScreen = currentScreen,
                         onGoToIngredients = { currentScreen = "ingredients" },
                         onGoToRecipes =  { currentScreen = "recipes" },
                     )

@@ -9,5 +9,5 @@ data class RecipeEntity(
     val name: String,
     val instructions: String,
     val dateCreated: Int,
-    val numTimesFollowed: Int = 0
+    var numTimesFollowed: Int = 0
 )

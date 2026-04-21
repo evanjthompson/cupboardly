@@ -3,7 +3,7 @@ package com.seniorproject.cupboardly.viewModels
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.seniorproject.cupboardly.classes.Ingredient
+import com.seniorproject.cupboardly.repos.IngredientRepo
 import com.seniorproject.cupboardly.room.entity.IngredientBatchEntity
 import com.seniorproject.cupboardly.room.entity.IngredientEntity
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,7 +20,7 @@ data class IngredientWithQuantity(
 
 class IngredientViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val ingredientWrapper = Ingredient(application)
+    private val ingredientWrapper = IngredientRepo(application)
 
     // ----------------------------
     // StateFlow to hold ingredients with total quantity
