@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cupboardly - Ingredient & Recipe Tracking</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <img src="cupboardlyLOGOv2.png" alt="Cupboardly Logo" class="logo">
+            <h1>Cupboardly</h1>
+            <p class="tagline">Ingredient & Recipe Tracking for Your Kitchen</p>
+        </header>
+
+        <!-- Navigation Menu -->
+        <nav class="section-nav">
+            <a href="#home" class="nav-link active">Home</a>
+            <a href="#about" class="nav-link">About</a>
+            <a href="#documentation" class="nav-link">Documentation</a>
+            <a href="#weekly-reports" class="nav-link">Weekly Reports</a>
+            <a href="#download" class="nav-link">Download</a>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Home Section -->
+            <section id="home" class="intro">
+                <h2>Senior Project - Spring 2026</h2>
+                <p>Cupboardly is an Android application designed to simplify kitchen management by tracking ingredients and recipes, whether for personal use or business operations.</p>
+            </section>
+
+            <!-- About Section -->
+            <section id="about" class="page-section">
+                <div class="page-header">
+                    <h1>About Cupboardly</h1>
+                </div>
+
+                <section class="content-section">
+                    <h2>Overview</h2>
+                    <p>Cupboardly is an Android application developed as a senior project at Pennsylvania Western University. It addresses a common problem in both home and business kitchens: keeping track of ingredients and recipes effectively.</p>
+                    <p>Whether you're managing ingredients for personal cooking or running a food business, Cupboardly simplifies the process by providing an organized, user-friendly interface for ingredient and recipe management.</p>
+                </section>
+
+                <section class="content-section">
+                    <h2>Key Features</h2>
+                    <div class="feature-list">
+                        <div class="feature-item">
+                            <h4>Ingredient Tracking</h4>
+                            <p>Track ingredients with quantities, expiration dates, prices, and dates added. Organize by individual batches and easily swap between units.</p>
+                        </div>
+                        <div class="feature-item">
+                            <h4>Recipe Management</h4>
+                            <p>Manage recipes with ingredient lists and instructions. Calculate total recipe cost based on ingredient prices in your inventory.</p>
+                        </div>
+                        <div class="feature-item">
+                            <h4>Recipe Cost Analysis</h4>
+                            <p>Automatically calculate how much each recipe costs based on the purchase prices of ingredients used.</p>
+                        </div>
+                        <div class="feature-item ingredient">
+                            <h4>Unit Conversion</h4>
+                            <p>Easily swap between different units including gallons, grams, cups, and pounds for flexible ingredient management.</p>
+                        </div>
+                        <div class="feature-item ingredient">
+                            <h4>AI Recipe Scanning</h4>
+                            <p>Add recipes by taking pictures of physical recipes. The app parses the information for quick recipe entry.</p>
+                        </div>
+                        <div class="feature-item ingredient">
+                            <h4>Inventory Deduction</h4>
+                            <p>When starting a recipe, the app automatically deducts the required ingredients from your inventory.</p>
+                        </div>
+                        <div class="feature-item">
+                            <h4>Data Management</h4>
+                            <p>Export and import your ingredients and recipes as database files for backup and sharing purposes.</p>
+                        </div>
+                        <div class="feature-item">
+                            <h4>Availability Alerts</h4>
+                            <p>Get notified when you don't have enough ingredients to make a specific recipe.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="content-section ingredient-themed">
+                    <h2>How It Works</h2>
+                    <h3>Ingredient Screen</h3>
+                    <ul>
+                        <li>View a complete list of all ingredients with total quantities</li>
+                        <li>Click on an ingredient to expand and see individual batches</li>
+                        <li>Each batch displays expiration date, quantity, price, and date added</li>
+                        <li>Convert between different measurement units</li>
+                        <li>Edit or delete ingredients and batches</li>
+                    </ul>
+                    <h3>Recipe Screen</h3>
+                    <ul>
+                        <li>View all recipes in an organized list</li>
+                        <li>Click to expand and see ingredients, instructions, and total recipe cost</li>
+                        <li>Add recipes manually or by scanning a photo</li>
+                        <li>Edit recipes as needed</li>
+                        <li>Start a recipe to automatically deduct ingredients</li>
+                    </ul>
+                </section>
+            </section>
+
+            <!-- Documentation Section -->
+            <section id="documentation" class="page-section">
+                <div class="page-header">
+                    <h1>Project Documentation</h1>
+                </div>
+
+                <section class="content-section">
+                    <p>Complete documentation for the Cupboardly project. Below are the key project documents organized by phase.</p>
+                </section>
+
+                <!-- Proposal -->
+                <section class="content-section ingredient-themed">
+                    <h2>Proposal</h2>
+                    <p>The initial project proposal outlining the project goals, scope, and justification.</p>
+                    <div style="text-align: center; margin: 20px 0;">
+                        <a href="docs/proposal.pdf" download class="download-link">Download Proposal</a>
+                    </div>
+                </section>
+
+                <!-- Requirements -->
+                <section class="content-section">
+                    <h2>Requirements</h2>
+                    <p>Detailed requirements for the Cupboardly application.</p>
+                    <div style="text-align: center; margin: 20px 0;">
+                        <a href="docs/requirements.pdf" download class="download-link">Download Requirements</a>
+                    </div>
+                </section>
+
+                <!-- Specification -->
+                <section class="content-section ingredient-themed">
+                    <h2>Specification</h2>
+                    <p>Technical specifications for the application including architecture and system design.</p>
+                    <div style="text-align: center; margin: 20px 0;">
+                        <a href="docs/specification.pdf" download class="download-link">Download Specification</a>
+                    </div>
+                </section>
+
+                <!-- Design -->
+                <section class="content-section">
+                    <h2>Design</h2>
+                    <p>Design documentation for the Cupboardly application.</p>
+                    <div style="text-align: center; margin: 20px 0;">
+                        <a href="docs/design.pdf" download class="download-link">Download Design</a>
+                    </div>
+                </section>
+
+                <!-- User Manual -->
+                <section class="content-section ingredient-themed">
+                    <h2>User Manual</h2>
+                    <p>Comprehensive guide for using the Cupboardly application.</p>
+                    <div style="text-align: center; margin: 20px 0;">
+                        <a href="docs/user-manual.pdf" download class="download-link">Download User Manual</a>
+                    </div>
+                </section>
+            </section>
+
+            <!-- Weekly Reports Section -->
+            <section id="weekly-reports" class="page-section">
+                <div class="page-header">
+                    <h1>Weekly Reports</h1>
+                </div>
+
+                <section class="content-section">
+                    <p>Progress reports and presentations from each week of the project. Each week includes a document and a PowerPoint presentation.</p>
+                </section>
+
+                <!-- Gantt Charts Section -->
+                <section class="content-section ingredient-themed">
+                    <h2>Project Timeline</h2>
+                    <div class="reports-grid">
+                        <div class="report-card">
+                            <h3>Initial Gantt Chart</h3>
+                            <p>Planned timeline for project completion.</p>
+                            <a href="reports/gantt-chart-initial.xlsx" download>Download</a>
+                        </div>
+                        <div class="report-card">
+                            <h3>Final Gantt Chart</h3>
+                            <p>Actual timeline and project completion status.</p>
+                            <a href="reports/gantt-chart-final.png" download>Download</a>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Weekly Reports -->
+                <section class="content-section">
+                    <h2>Week 2</h2>
+                    <div class="reports-grid">
+                        <div class="report-card">
+                            <h3>Week 2 Report</h3>
+                            <p>Project kickoff and initial planning.</p>
+                            <a href="reports/week-2-report.docx" download>Document</a>
+                            <a href="reports/week-2-presentation.pptx" download>Presentation</a>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="content-section ingredient-themed">
+                    <h2>Week 3</h2>
+                    <div class="reports-grid">
+                        <div class="report-card">
+                            <h3>Week 3 Report</h3>
+                            <p>Requirements analysis and design phase.</p>
+                            <a href="reports/week-3-report.docx" download>Document</a>
+                            <a href="reports/week-3-presentation.pptx" download>Presentation</a>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="content-section">
+                    <h2>Week 4</h2>
+                    <div class="reports-grid">
+                        <div class="report-card">
+                            <h3>Week 4 Report</h3>
+                            <p>Architecture design and database schema.</p>
+                            <a href="reports/week-4-report.docx" download>Document</a>
+                            <a href="reports/week-4-presentation.pptx" download>Presentation</a>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="content-section ingredient-themed">
+                    <h2>Week 5</h2>
+                    <div class="reports-grid">
+                        <div class="report-card">
+                            <h3>Week 5 Report</h3>
+                            <p>UI/UX design mockups and user flows.</p>
+                            <a href="reports/week-5-report.docx" download>Document</a>
+                            <a href="reports/week-5-presentation.pptx" download>Presentation</a>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="content-section">
+                    <h2>Week 6</h2>
+                    <div class="reports-grid">
+                        <div class="report-card">
+                            <h3>Week 6 Report</h3>
+                            <p>Development setup and initial implementation.</p>
+                            <a href="reports/week-6-report.docx" download>Document</a>
+                            <a href="reports/week-6-presentation.pptx" download>Presentation</a>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="content-section ingredient-themed">
+                    <h2>Week 7</h2>
+                    <div class="reports-grid">
+                        <div class="report-card">
+                            <h3>Week 7 Report</h3>
+                            <p>Ingredient management feature development.</p>
+                            <a href="reports/week-7-report.docx" download>Document</a>
+                            <a href="reports/week-7-presentation.pptx" download>Presentation</a>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="content-section">
+                    <h2>Week 8</h2>
+                    <div class="reports-grid">
+                        <div class="report-card">
+                            <h3>Week 8 Report</h3>
+                            <p>Recipe management feature development.</p>
+                            <a href="reports/week-8-report.docx" download>Document</a>
+                            <a href="reports/week-8-presentation.pptx" download>Presentation</a>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="content-section ingredient-themed">
+                    <h2>Week 9</h2>
+                    <div class="reports-grid">
+                        <div class="report-card">
+                            <h3>Week 9 Report</h3>
+                            <p>Advanced features implementation.</p>
+                            <a href="reports/week-9-report.docx" download>Document</a>
+                            <a href="reports/week-9-presentation.pptx" download>Presentation</a>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="content-section">
+                    <h2>Week 10</h2>
+                    <div class="reports-grid">
+                        <div class="report-card">
+                            <h3>Week 10 Report</h3>
+                            <p>Unit conversion and AI scanning features.</p>
+                            <a href="reports/week-10-report.docx" download>Document</a>
+                            <a href="reports/week-10-presentation.pptx" download>Presentation</a>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="content-section ingredient-themed">
+                    <h2>Week 11</h2>
+                    <div class="reports-grid">
+                        <div class="report-card">
+                            <h3>Week 11 Report</h3>
+                            <p>Testing and quality assurance.</p>
+                            <a href="reports/week-11-report.docx" download>Document</a>
+                            <a href="reports/week-11-presentation.pptx" download>Presentation</a>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="content-section">
+                    <h2>Week 12</h2>
+                    <div class="reports-grid">
+                        <div class="report-card">
+                            <h3>Week 12 Report</h3>
+                            <p>Bug fixes and optimization.</p>
+                            <a href="reports/week-12-report.docx" download>Document</a>
+                            <a href="reports/week-12-presentation.pptx" download>Presentation</a>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="content-section ingredient-themed">
+                    <h2>Week 13</h2>
+                    <div class="reports-grid">
+                        <div class="report-card">
+                            <h3>Week 13 Report</h3>
+                            <p>Final testing and user feedback implementation.</p>
+                            <a href="reports/week-13-report.docx" download>Document</a>
+                            <a href="reports/week-13-presentation.pptx" download>Presentation</a>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="content-section">
+                    <h2>Week 14</h2>
+                    <div class="reports-grid">
+                        <div class="report-card">
+                            <h3>Week 14 Report</h3>
+                            <p>Project completion and final presentation.</p>
+                            <a href="reports/week-14-report.docx" download>Document</a>
+                            <a href="reports/week-14-presentation.pptx" download>Presentation</a>
+                        </div>
+                    </div>
+                </section>
+            </section>
+
+            <!-- Download Section -->
+            <section id="download" class="page-section">
+                <div class="page-header">
+                    <h1>Download Cupboardly</h1>
+                </div>
+
+                <section class="content-section ingredient-themed">
+                    <h2>Download APK</h2>
+                    <p>Download the Cupboardly APK file to install the app on your Android device.</p>
+                    
+                    <div style="text-align: center; margin: 40px 0;">
+                        <a href="cupboardly.apk" download class="download-link">
+                            Download APK
+                        </a>
+                    </div>
+                </section>
+
+                <section class="content-section">
+                    <h2>Installation Instructions</h2>
+                    
+                    <h3>Step 1: Transfer the APK (if on a computer)</h3>
+                    <p>If you're downloading on a computer, connect your Android device to the computer via USB cable. Transfer the downloaded APK file to your device's storage. If you're already on your Android device, skip to Step 2.</p>
+
+                    <h3>Step 2: Install the APK on Your Device</h3>
+                    <ol style="color: var(--neutral-gray); margin-left: 25px;">
+                        <li style="margin-bottom: 12px;">Open the file manager on your Android device and locate the cupboardly.apk file</li>
+                        <li style="margin-bottom: 12px;">Tap the APK file to begin installation</li>
+                        <li style="margin-bottom: 12px;">You may see a security warning about installing from an unknown source. Tap <strong>Install anyway</strong> or <strong>Allow</strong> to proceed</li>
+                        <li style="margin-bottom: 12px;">Wait for the installation to complete</li>
+                        <li style="margin-bottom: 12px;">Once installed, you're ready to launch Cupboardly</li>
+                    </ol>
+                </section>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // Handle navigation link active states
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', function() {
+                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+
+        // Update active nav link on scroll
+        window.addEventListener('scroll', () => {
+            let current = '';
+            const sections = document.querySelectorAll('.page-section, .intro');
+            
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                const sectionHeight = section.clientHeight;
+                if (scrollY >= (sectionTop - 200)) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + current) {
+                    link.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
