@@ -139,7 +139,7 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+                    containerColor = Color(0xFFFAF9F7)
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
             ) {
@@ -185,7 +185,7 @@ fun SettingsScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(
-                                color = MaterialTheme.colorScheme.errorContainer,
+                                color = Color(0xFFFFEBEE),
                                 shape = RoundedCornerShape(10.dp)
                             )
                             .padding(12.dp)
@@ -193,7 +193,7 @@ fun SettingsScreen(
                         Text(
                             text = "⚠ Import will overwrite current ingredient and recipe data.",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onErrorContainer
+                            color = Color(0xFFC62828)
                         )
                     }
                 }

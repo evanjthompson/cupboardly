@@ -12,6 +12,18 @@ class IngredientRepo(context: Context) {
     private val batchDao = db.ingredientBatchDao()
     private val recipeIngredientDao = db.recipeIngredientDao()
 
+    // Format ingredient name
+    private fun formatIngredientName(name: String): String {
+        return name
+            .trim()
+            .lowercase()
+            .split(" ")
+            .filter { it.isNotBlank() }
+            .joinToString(" ") { word ->
+                word.replaceFirstChar { it.uppercase() }
+            }
+    }
+
     // -------------------------------
     // Ingredient Definition
     // -------------------------------
@@ -21,17 +33,19 @@ class IngredientRepo(context: Context) {
         density: Double,
         unit: String
     ): Long {
-        val existing = ingredientDao.getIngredientByName(name)
+
+        val formattedName = formatIngredientName(name)
+
+        val existing = ingredientDao.getIngredientByName(formattedName)
         if (existing != null) return existing.id
 
         val ingredient = IngredientEntity(
-            name = name,
+            name = formattedName,
             density = density,
             unit = unit
         )
 
-        val id = ingredientDao.insert(ingredient)
-        return id
+        return ingredientDao.insert(ingredient)
     }
 
     suspend fun updateIngredientDefinition(updatedIngredient: IngredientEntity) {
