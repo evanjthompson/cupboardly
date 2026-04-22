@@ -1300,76 +1300,113 @@ fun RecipeScreen(
 
                                     coroutineScope.launch {
                                         isSaving = true
-
-                                        recipeViewModel.updateRecipe(
-                                            recipe.copy(
-                                                name = editName.trim(),
-                                                instructions = editInstructions.trim()
-                                            )
-                                        )
-
-                                        val newLinks = mutableListOf<RecipeIngredientEntity>()
-
-                                        editSelectedIngredients.forEach { (id, qtyString) ->
-                                            val qty = qtyString.toDoubleOrNull() ?: 0.0
-                                            if (qty > 0) {
-                                                val ingredientEntity = allIngredients
-                                                    .find { it.ingredient.id == id }?.ingredient
-                                                val selectedUnit = editSelectedUnits[id]
-                                                    ?: ingredientEntity?.unit ?: "g"
-                                                val gramsToStore = ingredientViewModel.convertToGrams(
-                                                    qty, selectedUnit, ingredientEntity?.density
+                                        try {
+                                            recipeViewModel.updateRecipe(
+                                                recipe.copy(
+                                                    name = editName.trim(),
+                                                    instructions = editInstructions.trim()
                                                 )
+                                            )
+
+                                            val newLinks = mutableListOf<RecipeIngredientEntity>()
+
+                                            editSelectedIngredients.forEach { (id, qtyString) ->
+                                                val qty = qtyString.toDoubleOrNull() ?: 0.0
+                                                if (qty > 0) {
+                                                    val ingredientEntity = allIngredients
+                                                        .find { it.ingredient.id == id }?.ingredient
+                                                    val selectedUnit = editSelectedUnits[id]
+                                                        ?: ingredientEntity?.unit ?: "g"
+                                                    val gramsToStore = ingredientViewModel.convertToGrams(
+                                                        qty, selectedUnit, ingredientEntity?.density
+                                                    )
+                                                    newLinks.add(
+                                                        RecipeIngredientEntity(
+                                                            recipeId = recipe.id,
+                                                            ingredientId = id,
+                                                            quantityUsed = gramsToStore,
+                                                            unitUsed = selectedUnit
+                                                        )
+                                                    )
+                                                }
+                                            }
+
+                                            editTempIngredients.forEach { temp ->
+                                                val existing = ingredientViewModel.getIngredientByName(temp.name)
+                                                val targetId: Long
+                                                val targetDensity: Double?
+
+                                                if (existing != null) {
+                                                    targetId = existing.id
+                                                    targetDensity = existing.density
+                                                } else {
+                                                    val densityValue = askGeminiForDensity(temp.name)
+                                                    targetId = ingredientViewModel.addIngredientAndReturnId(
+                                                        name = temp.name,
+                                                        unit = temp.unit,
+                                                        density = densityValue
+                                                    )
+                                                    targetDensity = densityValue
+                                                }
+
+                                                val qty = temp.quantity.toDoubleOrNull() ?: 0.0
+                                                val grams = ingredientViewModel.convertToGrams(qty, temp.unit, targetDensity)
                                                 newLinks.add(
                                                     RecipeIngredientEntity(
                                                         recipeId = recipe.id,
-                                                        ingredientId = id,
-                                                        quantityUsed = gramsToStore,
-                                                        unitUsed = selectedUnit
+                                                        ingredientId = targetId,
+                                                        quantityUsed = grams,
+                                                        unitUsed = temp.unit
                                                     )
                                                 )
                                             }
-                                        }
 
-                                        editTempIngredients.forEach { temp ->
-                                            val existing = ingredientViewModel.getIngredientByName(temp.name)
-                                            val targetId: Long
-                                            val targetDensity: Double?
+                                            recipeViewModel.replaceIngredientsForRecipe(recipe.id, newLinks)
+                                            
+                                            // Immediately recalculate ingredient details to avoid "Loading..." flash
+                                            val updatedLinks = recipeViewModel.getIngredientsForRecipe(recipe.id)
+                                            val ingredientDetails = mutableListOf<RecipeIngredientDetail>()
+                                            var totalRecipeCost = 0.0
 
-                                            if (existing != null) {
-                                                targetId = existing.id
-                                                targetDensity = existing.density
-                                            } else {
-                                                val densityValue = askGeminiForDensity(temp.name)
-                                                targetId = ingredientViewModel.addIngredientAndReturnId(
-                                                    name = temp.name,
-                                                    unit = temp.unit,
-                                                    density = densityValue
-                                                )
-                                                targetDensity = densityValue
+                                            updatedLinks.forEach { link ->
+                                                val ingredient = ingredientViewModel.getIngredientById(link.ingredientId)
+                                                ingredient?.let {
+                                                    val displayQty = ingredientViewModel.convertFromGrams(
+                                                        link.quantityUsed,
+                                                        link.unitUsed,
+                                                        it.density
+                                                    )
+
+                                                    val costPerGram = calculateCostPerGram(link.ingredientId, ingredientViewModel)
+                                                    val ingredientCost = link.quantityUsed * costPerGram
+
+                                                    ingredientDetails.add(
+                                                        RecipeIngredientDetail(
+                                                            name = it.name,
+                                                            quantity = displayQty,
+                                                            unit = link.unitUsed,
+                                                            cost = ingredientCost
+                                                        )
+                                                    )
+                                                    totalRecipeCost += ingredientCost
+                                                }
                                             }
 
-                                            val qty = temp.quantity.toDoubleOrNull() ?: 0.0
-                                            val grams = ingredientViewModel.convertToGrams(qty, temp.unit, targetDensity)
-                                            newLinks.add(
-                                                RecipeIngredientEntity(
-                                                    recipeId = recipe.id,
-                                                    ingredientId = targetId,
-                                                    quantityUsed = grams,
-                                                    unitUsed = temp.unit
-                                                )
-                                            )
+                                            recipeIngredientsDetailMap[recipe.id] = ingredientDetails
+                                            recipeTotalCostMap[recipe.id] = totalRecipeCost
+                                            val ingredientsWithQuantities = ingredientDetails.map {
+                                                "${formatDouble(it.quantity)} ${it.unit} ${it.name}"
+                                            }
+                                            recipeIngredientsMap[recipe.id] = ingredientsWithQuantities.joinToString(", ")
+
+                                            recipeViewModel.refresh()
+                                            showEditDialog = false
+                                            editingRecipeId = null
+                                        } catch (e: Exception) {
+                                            Log.e("RecipeScreen", "Error saving recipe", e)
+                                        } finally {
+                                            isSaving = false
                                         }
-
-                                        recipeViewModel.replaceIngredientsForRecipe(recipe.id, newLinks)
-                                        recipeIngredientsMap.remove(recipe.id)
-                                        recipeIngredientsDetailMap.remove(recipe.id)
-                                        recipeTotalCostMap.remove(recipe.id)
-
-                                        recipeViewModel.refresh()
-                                        isSaving = false
-                                        showEditDialog = false
-                                        editingRecipeId = null
                                     }
                                 },
                                 enabled = !isSaving,
@@ -1572,7 +1609,7 @@ fun RecipeScreen(
         }
 
         // ---------------- LOADING OVERLAY ----------------
-        if (isLoading && !showAddDialog) {
+        if (isLoading && !showAddDialog && !showEditDialog) {
             Box(
                 modifier = Modifier
                     .matchParentSize()
