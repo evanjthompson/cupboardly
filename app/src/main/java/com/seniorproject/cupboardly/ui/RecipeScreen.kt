@@ -1362,7 +1362,7 @@ fun RecipeScreen(
                                             }
 
                                             recipeViewModel.replaceIngredientsForRecipe(recipe.id, newLinks)
-                                            
+
                                             // Immediately recalculate ingredient details to avoid "Loading..." flash
                                             val updatedLinks = recipeViewModel.getIngredientsForRecipe(recipe.id)
                                             val ingredientDetails = mutableListOf<RecipeIngredientDetail>()

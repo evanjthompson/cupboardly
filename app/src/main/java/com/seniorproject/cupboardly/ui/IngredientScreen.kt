@@ -108,7 +108,10 @@ suspend fun deductFromBatchesFifo(
             if (newQty <= 0.0) {
                 ingredientViewModel.deleteBatch(batch)
             } else {
-                ingredientViewModel.updateBatch(batch.copy(quantity = newQty))
+                // Proportionally reduce the price based on the remaining quantity
+                val costPerGram = batch.price / batch.quantity
+                val newPrice = newQty * costPerGram
+                ingredientViewModel.updateBatch(batch.copy(quantity = newQty, price = newPrice))
             }
         }
     }
@@ -1124,6 +1127,24 @@ fun IngredientScreen(
                                                         ) {
                                                             Column(modifier = Modifier.padding(8.dp)) {
                                                                 Row(
+                                                                    modifier = Modifier
+                                                                        .fillMaxWidth()
+                                                                        .padding(bottom = 8.dp),
+                                                                    horizontalArrangement = Arrangement.End
+                                                                ) {
+                                                                    IconButton(
+                                                                        onClick = { batchPendingDelete = batch },
+                                                                        modifier = Modifier.size(28.dp)
+                                                                    ) {
+                                                                        Text(
+                                                                            "✕",
+                                                                            color = Color.Red,
+                                                                            fontSize = 20.sp,
+                                                                            fontWeight = FontWeight.Bold
+                                                                        )
+                                                                    }
+                                                                }
+                                                                Row(
                                                                     modifier = Modifier.fillMaxWidth(),
                                                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                                                 ) {
@@ -1261,22 +1282,6 @@ fun IngredientScreen(
                                                                         colors = ButtonDefaults.buttonColors(containerColor = ingredientGold),
                                                                         modifier = Modifier.weight(1f)
                                                                     ) { Text("Save") }
-
-                                                                    // Delete batch — shows confirmation dialog
-                                                                    Button(
-                                                                        onClick = {
-                                                                            batchPendingDelete = batch
-                                                                        },
-                                                                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
-                                                                        modifier = Modifier.weight(0.75f)
-                                                                    ) {
-                                                                        AutoSizeText(
-                                                                            text = "Delete",
-                                                                            maxFontSize = 16.sp,
-                                                                            minFontSize = 8.sp,
-                                                                            modifier = Modifier.fillMaxWidth()
-                                                                        )
-                                                                    }
                                                                 }
                                                             }
                                                         }
