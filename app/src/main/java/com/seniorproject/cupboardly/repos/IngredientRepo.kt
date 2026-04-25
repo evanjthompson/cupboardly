@@ -5,6 +5,7 @@ import com.seniorproject.cupboardly.room.database.AppDatabase
 import com.seniorproject.cupboardly.room.entity.IngredientBatchEntity
 import com.seniorproject.cupboardly.room.entity.IngredientEntity
 
+// Repo accesses database via DAO
 class IngredientRepo(context: Context) {
 
     private val db = AppDatabase.getDatabase(context)
@@ -24,10 +25,7 @@ class IngredientRepo(context: Context) {
             }
     }
 
-    // -------------------------------
-    // Ingredient Definition
-    // -------------------------------
-
+    // add ingredient definition
     suspend fun addIngredientDefinition(
         name: String,
         density: Double,
@@ -48,6 +46,7 @@ class IngredientRepo(context: Context) {
         return ingredientDao.insert(ingredient)
     }
 
+    // update ingredient definition
     suspend fun updateIngredientDefinition(updatedIngredient: IngredientEntity) {
         val existing = ingredientDao.getIngredientById(updatedIngredient.id) ?: return
 
@@ -76,18 +75,12 @@ class IngredientRepo(context: Context) {
         return ingredientDao.getAllIngredients()
     }
 
-    // -------------------------------
-    // Recipe relationship checks
-    // -------------------------------
-
+    // check for recipe / ingredient relationship
     suspend fun isUsedByRecipe(ingredientId: Long): Boolean {
         return recipeIngredientDao.getRecipesForIngredient(ingredientId).isNotEmpty()
     }
 
-    // -------------------------------
-    // Ingredient Batches
-    // -------------------------------
-
+    // ingredient batches
     suspend fun addBatch(
         ingredientId: Long,
         quantity: Double,       // grams
@@ -128,15 +121,4 @@ class IngredientRepo(context: Context) {
         }
     }
 
-    // -------------------------------
-    // Unit conversion helpers
-    // -------------------------------
-
-    fun convertFromGrams(grams: Double, unit: String, density: Double?): Double {
-        return com.seniorproject.cupboardly.classes.convertFromGrams(grams, unit, density)
-    }
-
-    fun convertToGrams(amount: Double, unit: String, density: Double?): Double {
-        return com.seniorproject.cupboardly.classes.convertToGrams(amount, unit, density)
-    }
 }

@@ -5,12 +5,12 @@ import com.seniorproject.cupboardly.room.database.AppDatabase
 import com.seniorproject.cupboardly.room.entity.RecipeEntity
 import com.seniorproject.cupboardly.room.entity.RecipeIngredientEntity
 
+// repo accesses database via DAO
 class RecipeRepo(context: Context) {
 
     private val db = AppDatabase.getDatabase(context)
     private val recipeDao = db.recipeDao()
     private val recipeIngredientDao = db.recipeIngredientDao()
-    private val ingredientDao = db.ingredientDao()
 
     suspend fun addRecipe(name: String, instructions: String, dateCreated: Int): Long {
         val recipe = RecipeEntity(name = name, instructions = instructions, dateCreated = dateCreated)
@@ -21,6 +21,7 @@ class RecipeRepo(context: Context) {
         recipeDao.update(recipe)
     }
 
+    // link an ingredient to a recipe
     suspend fun addIngredientToRecipe(recipeId: Long, ingredientId: Long, quantityUsed: Double, unitUsed: String) {
         recipeIngredientDao.insert(
             RecipeIngredientEntity(

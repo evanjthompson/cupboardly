@@ -13,7 +13,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderCopy
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,11 +29,8 @@ import com.seniorproject.cupboardly.R
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.TextUnit
 import com.seniorproject.cupboardly.classes.askGeminiForDensity
 import com.seniorproject.cupboardly.room.entity.IngredientBatchEntity
 import kotlinx.coroutines.launch
@@ -44,28 +40,27 @@ import java.util.Locale
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
+import kotlin.math.roundToInt
 
-// ---------------------------------------------------------------------------
-// Utilities
-// ---------------------------------------------------------------------------
-
+// rounding values
 fun formatDouble(value: Double): String {
-    val rounded = Math.round(value * 100) / 100.0
+    val rounded = (value * 100).roundToInt() / 100.0
     return if (rounded % 1.0 == 0.0) rounded.toInt().toString() else rounded.toString()
 }
 
-/** Parse a "YYYY-MM-DD" string into a Unix timestamp (seconds), or null if blank/invalid. */
+// Parse a "YYYY-MM-DD" string into a Unix timestamp (seconds), or null if blank/invalid.
 fun parseDateToUnix(dateStr: String): Int? {
     if (dateStr.isBlank()) return null
     return try {
         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         val date = sdf.parse(dateStr.trim()) ?: return null
         (date.time / 1000).toInt()
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         null
     }
 }
 
+// set expiration date color based on time til expiring
 fun getExpirationColor(expirationDate: Int): Color {
     val todayUnix = parseDateToUnix(
         SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
@@ -81,7 +76,7 @@ fun getExpirationColor(expirationDate: Int): Color {
     }
 }
 
-/** Deduct from ingredient batches using FIFO (first-in, first-out) order. */
+// Deduct from ingredient batches using FIFO (first-in, first-out) order.
 suspend fun deductFromBatchesFifo(
     ingredientId: Long,
     quantityInUnit: Double,
@@ -117,34 +112,7 @@ suspend fun deductFromBatchesFifo(
     }
 }
 
-@Composable
-fun AutoSizeText(
-    text: String,
-    modifier: Modifier = Modifier,
-    minFontSize: TextUnit = 8.sp,
-    maxFontSize: TextUnit = 16.sp,
-    style: TextStyle = LocalTextStyle.current
-) {
-    var fontSize by remember { mutableStateOf(maxFontSize) }
-    Text(
-        text = text,
-        modifier = modifier,
-        style = style.copy(fontSize = fontSize),
-        maxLines = 1,
-        softWrap = false,
-        overflow = TextOverflow.Clip,
-        onTextLayout = { result ->
-            if (result.hasVisualOverflow && fontSize > minFontSize) {
-                fontSize = (fontSize.value * 0.9f).sp
-            }
-        }
-    )
-}
-
-// ---------------------------------------------------------------------------
 // Date Picker Field
-// ---------------------------------------------------------------------------
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExpirationDateField(
@@ -183,8 +151,7 @@ fun ExpirationDateField(
                 )
             }
         },
-        modifier = modifier
-            .clickable { showPicker = true }
+        modifier = modifier.clickable { showPicker = true }
     )
 
     if (showPicker) {
@@ -199,7 +166,14 @@ fun ExpirationDateField(
 
                     TextButton(onClick = {
                         val millis = datePickerState.selectedDateMillis
-                        onDateSelected(millis?.let { (it / 1000).toInt() })
+                        if (millis != null) {
+                            // Add 12 hours to land safely in the middle of the day,
+                            // avoiding timezone-caused date shifts
+                            val adjustedMillis = millis + (12 * 60 * 60 * 1000L)
+                            onDateSelected((adjustedMillis / 1000).toInt())
+                        } else {
+                            onDateSelected(null)
+                        }
                         showPicker = false
                     }) { Text("OK") }
                 }
@@ -213,10 +187,7 @@ fun ExpirationDateField(
     }
 }
 
-// ---------------------------------------------------------------------------
-// Shared text field colors
-// ---------------------------------------------------------------------------
-
+// Shared text field colors (added due to visibility issues)
 @Composable
 fun darkTextFieldColors() = OutlinedTextFieldDefaults.colors(
     focusedTextColor = Color.Black,
@@ -234,10 +205,7 @@ fun darkTextFieldColors() = OutlinedTextFieldDefaults.colors(
     cursorColor = Color.Black
 )
 
-// ---------------------------------------------------------------------------
 // Helper: expiration string
-// ---------------------------------------------------------------------------
-
 @Composable
 fun expirationAnnotatedString(
     addedText: String,
@@ -254,10 +222,7 @@ fun expirationAnnotatedString(
     }
 }
 
-// ---------------------------------------------------------------------------
-// Screen
-// ---------------------------------------------------------------------------
-
+// Main Ingredient Screen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IngredientScreen(
@@ -275,9 +240,7 @@ fun IngredientScreen(
 
     val ingredients by viewModel.ingredients.collectAsState()
 
-    // ---------------------------------------------------------------------------
-    // Expired ingredients popup state
-    // ---------------------------------------------------------------------------
+    // Expired ingredients popup
     var expiredIngredients by remember { mutableStateOf<List<Pair<String, Date>>>(emptyList()) }
     var showExpiredDialog by remember { mutableStateOf(false) }
     var expiredCheckDone by remember { mutableStateOf(false) }
@@ -310,7 +273,7 @@ fun IngredientScreen(
             containerColor = Color.White,
             titleContentColor = Color.Black,
             textContentColor = Color.Black,
-            onDismissRequest = { showExpiredDialog = false },
+            onDismissRequest = { },
             title = {
                 Text(
                     "⚠️ Expired Ingredients",
@@ -355,7 +318,7 @@ fun IngredientScreen(
             },
             confirmButton = {
                 Button(
-                    onClick = { showExpiredDialog = false },
+                    onClick = { },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828))
                 ) {
                     Text("Dismiss")
@@ -417,7 +380,7 @@ fun IngredientScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(
-                            color = Color(0x22000000), // shared translucent background
+                            color = Color(0x22000000), //  translucent background
                             shape = RoundedCornerShape(12.dp)
                         )
                         .padding(horizontal = 6.dp, vertical = 6.dp),
@@ -477,9 +440,7 @@ fun IngredientScreen(
                     )
                 }
 
-                // ---------------------------------------------------------------------------
                 // Ingredient list
-                // ---------------------------------------------------------------------------
                 LazyColumn {
                     items(
                         items = filteredIngredients,
@@ -507,7 +468,7 @@ fun IngredientScreen(
                         var displayUnit by remember { mutableStateOf(ingredient.unit) }
                         LaunchedEffect(ingredient.unit) { displayUnit = ingredient.unit }
 
-                        // Edit form state — name only
+                        // Edit form state
                         var editName by remember { mutableStateOf(ingredient.name) }
                         var editNameError by remember { mutableStateOf<String?>(null) }
 
@@ -541,7 +502,7 @@ fun IngredientScreen(
                         var useSomeError by remember { mutableStateOf<String?>(null) }
                         var batchPendingDelete by remember { mutableStateOf<IngredientBatchEntity?>(null) }
 
-                        // Derived display quantity
+                        // display quantity
                         val displayQty =
                             remember(totalQuantityGrams, ingredient.density, displayUnit) {
                                 viewModel.convertFromGrams(
@@ -551,9 +512,7 @@ fun IngredientScreen(
                                 )
                             }
 
-                        // -----------------------------------------------------------------------
                         // Confirmation: delete a single batch
-                        // -----------------------------------------------------------------------
                         if (batchPendingDelete != null) {
                             val batchQtyDisplay = viewModel.convertFromGrams(
                                 batchPendingDelete!!.quantity, displayUnit, ingredient.density
@@ -590,9 +549,7 @@ fun IngredientScreen(
                             )
                         }
 
-                        // -----------------------------------------------------------------------
                         // Confirmation: delete entire ingredient
-                        // -----------------------------------------------------------------------
                         if (showDeleteIngredientConfirm) {
                             AlertDialog(
                                 containerColor = Color.White,
@@ -636,9 +593,7 @@ fun IngredientScreen(
                             )
                         }
 
-                        // -----------------------------------------------------------------------
                         // Confirmation: reset ingredient (clear all batches)
-                        // -----------------------------------------------------------------------
                         if (showResetConfirm) {
                             AlertDialog(
                                 containerColor = Color.White,
@@ -670,7 +625,6 @@ fun IngredientScreen(
                         }
 
                         // Use Some dialog — deduct quantity from batches in FIFO order
-                        // -----------------------------------------------------------------------
                         if (showUseSomeDialog) {
                             val unitOptions = if (ingredient.unit == "unit") {
                                 listOf("unit")
@@ -905,7 +859,7 @@ fun IngredientScreen(
                                 if (expanded) {
                                     when {
 
-                                        // ADD MORE
+                                        // Add more
                                         isAddingMore -> {
                                             Spacer(modifier = Modifier.height(8.dp))
 
@@ -1069,7 +1023,7 @@ fun IngredientScreen(
                                             }
                                         }
 
-                                        // EDIT
+                                        // edit
                                         isEditing -> {
                                             Spacer(modifier = Modifier.height(8.dp))
 
@@ -1427,7 +1381,7 @@ fun IngredientScreen(
                                             }
                                         }
 
-                                        // DEFAULT VIEW
+                                        // default view
                                         else -> {
                                             Spacer(modifier = Modifier.height(8.dp))
 

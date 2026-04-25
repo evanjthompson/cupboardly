@@ -1,8 +1,10 @@
 package com.seniorproject.cupboardly.classes
 
+// List of conversion values between volume and ml
 val VOLUME_TO_ML = mapOf(
     "ml" to 1.0, "cup" to 236.588, "tbsp" to 14.7868, "tsp" to 4.92892, "floz" to 29.5735, "gal" to 3785.408
 )
+// list of conversion values between mass and g
 val MASS_TO_GRAM = mapOf(
     "g" to 1.0, "kg" to 1000.0, "oz" to 28.3495, "lb" to 453.592
 )

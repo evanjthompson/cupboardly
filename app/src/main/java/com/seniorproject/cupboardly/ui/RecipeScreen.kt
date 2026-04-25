@@ -50,19 +50,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.FolderCopy
+import androidx.compose.material3.HorizontalDivider
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.style.TextOverflow
 import com.seniorproject.cupboardly.classes.askGeminiForRecipeParse
-import com.seniorproject.cupboardly.room.dao.RecipeDao
 import com.seniorproject.cupboardly.room.entity.RecipeIngredientEntity
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
+// Photo processing helper
 suspend fun processPhotoUri(context: Context, photoUri: Uri?): String? {
     if (photoUri == null) return null
 
@@ -70,15 +67,15 @@ suspend fun processPhotoUri(context: Context, photoUri: Uri?): String? {
         val image = InputImage.fromFilePath(context, photoUri)
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
-        val result = kotlinx.coroutines.suspendCancellableCoroutine<String?> { cont ->
+        val result = kotlinx.coroutines.suspendCancellableCoroutine { cont ->
             recognizer.process(image)
                 .addOnSuccessListener { visionText ->
                     Log.d("MLKit", "Detected text: ${visionText.text}")
-                    cont.resume(visionText.text) {}
+                    cont.resume(visionText.text) { _, _, _ -> }
                 }
                 .addOnFailureListener { e ->
                     Log.e("MLKit", "Text recognition failed", e)
-                    cont.resume(null) {}
+                    cont.resume(null) { _, _, _ -> }
                 }
         }
 
@@ -89,10 +86,10 @@ suspend fun processPhotoUri(context: Context, photoUri: Uri?): String? {
     }
 }
 
-/**
- * Calculate the cost per gram for an ingredient based on its batches.
- * Returns: total price of all batches / total quantity in grams
- */
+
+// Calculate the cost per gram for an ingredient based on its batches.
+// Returns: total price of all batches / total quantity in grams
+
 suspend fun calculateCostPerGram(
     ingredientId: Long,
     ingredientViewModel: IngredientViewModel
@@ -104,10 +101,10 @@ suspend fun calculateCostPerGram(
     return if (totalQuantityGrams > 0.0) totalPrice / totalQuantityGrams else 0.0
 }
 
-/**
- * Deducts [gramsNeeded] from an ingredient's batches using FIFO order (oldest first).
- * Fully consumed batches are deleted; the last partially consumed batch is updated.
- */
+
+ // Deducts [gramsNeeded] from an ingredient's batches using FIFO order (oldest first).
+ // Fully consumed batches are deleted; the last partially consumed batch is updated.
+
 suspend fun deductFromBatchesFifo(
     ingredientId: Long,
     gramsNeeded: Double,
@@ -139,10 +136,7 @@ suspend fun deductFromBatchesFifo(
 }
 
 
-// ---------------------------------------------------------------------------
 // TempIngredient
-// ---------------------------------------------------------------------------
-
 class TempIngredient(
     val name: String,
     quantity: String = "1.0",
@@ -152,10 +146,7 @@ class TempIngredient(
     var unit by mutableStateOf(unit)
 }
 
-// ---------------------------------------------------------------------------
-// Screen
-// ---------------------------------------------------------------------------
-
+// main Recipe Screen
 @Composable
 fun RecipeScreen(
     currentScreen: String,
@@ -198,9 +189,7 @@ fun RecipeScreen(
     val prefillSelectedIngredients = remember { mutableStateMapOf<Long, String>() }
     val prefillSelectedUnits = remember { mutableStateMapOf<Long, String>() }
 
-    // KEY FIX: incrementing this forces the Add dialog to fully recompose,
-    // so all remember { } blocks inside it re-initialize with the latest prefill values.
-    var dialogKey by remember { mutableStateOf(0) }
+    var dialogKey by remember { mutableIntStateOf(0) }
 
     var showAddDialog by remember { mutableStateOf(false) }
 
@@ -211,7 +200,7 @@ fun RecipeScreen(
     // Search state
     var searchQuery by remember { mutableStateOf("") }
 
-    // Camera launcher — can be triggered from inside the Add dialog too
+    // Camera launcher
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
@@ -228,7 +217,7 @@ fun RecipeScreen(
                         ingredientList = allIngredients
                     )
                     if (result != null) {
-                        // 1. Populate prefill state
+                        // Populate prefill state
                         prefillName = result.name
                         prefillInstructions = result.instructions.joinToString("\n")
                         prefillTempIngredients.clear()
@@ -255,8 +244,7 @@ fun RecipeScreen(
                             }
                         }
 
-                        // 2. Increment the key BEFORE showing the dialog so the dialog
-                        //    composes fresh with the new prefill values.
+                        // Increment the key before showing the dialog
                         dialogKey++
                         showAddDialog = true
                     }
@@ -340,7 +328,6 @@ fun RecipeScreen(
                 recipeIngredientsDetailMap[recipe.id] = ingredientDetails
                 recipeTotalCostMap[recipe.id] = totalRecipeCost
 
-                // Also keep the old map for backward compatibility if needed
                 val ingredientsWithQuantities = ingredientDetails.map {
                     "${formatDouble(it.quantity)} ${it.unit} ${it.name}"
                 }
@@ -397,7 +384,7 @@ fun RecipeScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        color = Color(0x22000000), // shared translucent background
+                        color = Color(0x22000000), // translucent background
                         shape = RoundedCornerShape(12.dp)
                     )
                     .padding(horizontal = 6.dp, vertical = 6.dp),
@@ -481,7 +468,7 @@ fun RecipeScreen(
                                 Spacer(modifier = Modifier.height(8.dp))
 
                                 // Recipe multiplier controls
-                                var multiplier by remember { mutableStateOf(1.0) }
+                                var multiplier by remember { mutableDoubleStateOf(1.0) }
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -526,7 +513,11 @@ fun RecipeScreen(
                                         }
                                     }
                                     Spacer(modifier = Modifier.height(8.dp))
-                                    Divider()
+                                    HorizontalDivider(
+                                        Modifier,
+                                        DividerDefaults.Thickness,
+                                        DividerDefaults.color
+                                    )
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -611,7 +602,7 @@ fun RecipeScreen(
             )
         }
 
-        // ---------------- ADD RECIPE DIALOG ----------------
+        // add recipe dialog
         // key(dialogKey) forces full recomposition every time dialogKey changes,
         // ensuring remember { } blocks re-initialize with the latest prefill values.
         if (showAddDialog) {
@@ -678,7 +669,11 @@ fun RecipeScreen(
                                     label = { Text("Instructions") }
                                 )
 
-                                Divider()
+                                HorizontalDivider(
+                                    Modifier,
+                                    DividerDefaults.Thickness,
+                                    DividerDefaults.color
+                                )
 
                                 Text("Add New Ingredient", fontWeight = FontWeight.Bold)
 
@@ -722,7 +717,11 @@ fun RecipeScreen(
                                     Text(it, color = Color.Red, fontSize = 14.sp)
                                 }
 
-                                Divider()
+                                HorizontalDivider(
+                                    Modifier,
+                                    DividerDefaults.Thickness,
+                                    DividerDefaults.color
+                                )
 
                                 Text("Select Ingredients", fontWeight = FontWeight.Bold)
 
@@ -1015,13 +1014,12 @@ fun RecipeScreen(
                             }
                         }
                     },
-                    // dismissButton is intentionally empty — buttons are all in confirmButton row
                     dismissButton = {}
                 )
             }
         }
 
-        // ---------------- EDIT RECIPE DIALOG ----------------
+        // Edit Recipe dialog
 
         if (showEditDialog && editingRecipeId != null) {
             val recipe = recipes.find { it.id == editingRecipeId }
@@ -1096,7 +1094,11 @@ fun RecipeScreen(
                                 minLines = 3
                             )
 
-                            Divider()
+                            HorizontalDivider(
+                                Modifier,
+                                DividerDefaults.Thickness,
+                                DividerDefaults.color
+                            )
 
                             Text("Add New Ingredient", fontWeight = FontWeight.Bold)
 
@@ -1136,7 +1138,11 @@ fun RecipeScreen(
                                 Text(it, color = Color.Red, fontSize = 14.sp)
                             }
 
-                            Divider()
+                            HorizontalDivider(
+                                Modifier,
+                                DividerDefaults.Thickness,
+                                DividerDefaults.color
+                            )
 
                             Text("Select Ingredients", fontWeight = FontWeight.Bold)
 
@@ -1422,7 +1428,7 @@ fun RecipeScreen(
 
                                             recipeViewModel.replaceIngredientsForRecipe(recipe.id, newLinks)
 
-                                            // Immediately recalculate ingredient details to avoid "Loading..." flash
+                                            // Immediately recalculate ingredient details
                                             val updatedLinks = recipeViewModel.getIngredientsForRecipe(recipe.id)
                                             val ingredientDetails = mutableListOf<RecipeIngredientDetail>()
                                             var totalRecipeCost = 0.0
@@ -1492,7 +1498,7 @@ fun RecipeScreen(
             }
         }
 
-        // ---------------- DELETE RECIPE CONFIRMATION DIALOG ----------------
+        // delete recipe confirmation dialog
 
         if (showDeleteConfirmDialog && recipeToDelete != null) {
             val recipeName = recipes.find { it.id == recipeToDelete }?.name ?: ""
@@ -1532,7 +1538,7 @@ fun RecipeScreen(
             )
         }
 
-        // ---------------- START RECIPE DIALOG ----------------
+        // start recipe dialog
 
         if (showStartDialog && activeRecipe != null) {
 
@@ -1671,7 +1677,7 @@ fun RecipeScreen(
             )
         }
 
-        // ---------------- LOADING OVERLAY ----------------
+        // "loading" overlay
         if (isLoading && !showAddDialog && !showEditDialog) {
             Box(
                 modifier = Modifier

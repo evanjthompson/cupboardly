@@ -134,7 +134,6 @@ fun SettingsScreen(
                 recipeBlue = recipeBlue
             )
 
-            // --- Backup Card ---
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -200,7 +199,7 @@ fun SettingsScreen(
             }
         }
 
-        // --- IMPORT CONFIRMATION DIALOG ---
+        // import confirmation dialog
         if (showImportDialog) {
             AlertDialog(
                 onDismissRequest = { showImportDialog = false },

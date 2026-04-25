@@ -20,8 +20,10 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             CupboardlyTheme {
+                // launch to ingredients screen
                 var currentScreen by remember { mutableStateOf("ingredients") }
 
+                // mapping of screen transitions
                 when (currentScreen) {
                     "ingredients" -> IngredientScreen(
                         currentScreen = currentScreen,

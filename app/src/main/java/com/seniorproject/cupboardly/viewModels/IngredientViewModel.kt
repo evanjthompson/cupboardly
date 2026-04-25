@@ -10,9 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-// ----------------------------
-// UI model for ingredient + total quantity
-// ----------------------------
+// class for displaying ingredient + quantity
 data class IngredientWithQuantity(
     val ingredient: IngredientEntity,
     val totalQuantity: Double
@@ -21,16 +19,11 @@ data class IngredientWithQuantity(
 class IngredientViewModel(application: Application) : AndroidViewModel(application) {
 
     private val ingredientWrapper = IngredientRepo(application)
-
-    // ----------------------------
-    // StateFlow to hold ingredients with total quantity
-    // ----------------------------
+    // list of ingredients and quantities
     private val _ingredients = MutableStateFlow<List<IngredientWithQuantity>>(emptyList())
     val ingredients: StateFlow<List<IngredientWithQuantity>> = _ingredients
 
-    // ----------------------------
-    // Initialization
-    // ----------------------------
+    // load ingredients on launch or refresh
     init {
         viewModelScope.launch { loadIngredients() }
     }
@@ -48,9 +41,7 @@ class IngredientViewModel(application: Application) : AndroidViewModel(applicati
         _ingredients.value = result
     }
 
-    // ----------------------------
     // Ingredient Definition
-    // ----------------------------
     fun addIngredient(
         name: String,
         quantity: Double,
@@ -67,7 +58,7 @@ class IngredientViewModel(application: Application) : AndroidViewModel(applicati
             // Add batch for inventory
             ingredientWrapper.addBatch(
                 ingredientId,
-                ingredientWrapper.convertToGrams(quantity, unit, density),
+                convertToGrams(quantity, unit, density),
                 price,
                 expirationDate,
                 dateEntered
@@ -110,17 +101,12 @@ class IngredientViewModel(application: Application) : AndroidViewModel(applicati
         return ingredientWrapper.getIngredientById(id)
     }
 
-    // ----------------------------
     // Recipe relationship checks
-    // ----------------------------
-
     suspend fun isUsedByRecipe(ingredientId: Long): Boolean {
         return ingredientWrapper.isUsedByRecipe(ingredientId)
     }
 
-    // ----------------------------
-    // Batch
-    // ----------------------------
+    // batches of ingredients - an ingredient is composed of batches
     fun addBatch(
         ingredientId: Long,
         quantity: Double,
@@ -140,6 +126,7 @@ class IngredientViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    // functions to update or delete batches
     fun updateBatch(batch: IngredientBatchEntity) {
         viewModelScope.launch {
             ingredientWrapper.updateBatch(batch)
@@ -154,6 +141,7 @@ class IngredientViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    // remove all batches but don't delete the ingredient entry
     fun resetIngredient(ingredientId: Long) {
         viewModelScope.launch {
             ingredientWrapper.resetBatches(ingredientId)
@@ -169,9 +157,7 @@ class IngredientViewModel(application: Application) : AndroidViewModel(applicati
         return ingredientWrapper.getTotalQuantity(ingredientId)
     }
 
-    // ----------------------------
     // Unit conversion helpers
-    // ----------------------------
     fun convertFromGrams(grams: Double, unit: String, density: Double?): Double {
         return com.seniorproject.cupboardly.classes.convertFromGrams(grams, unit, density)
     }

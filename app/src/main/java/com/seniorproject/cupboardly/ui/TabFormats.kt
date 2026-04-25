@@ -40,7 +40,7 @@ fun TopNavTabs(
             verticalAlignment = Alignment.CenterVertically
         ) {
 
-            // ---------------- INGREDIENTS ----------------
+            // ingredients tab
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -59,7 +59,7 @@ fun TopNavTabs(
                 )
             }
 
-            // ---------------- RECIPES ----------------
+            // recipes tab
             Box(
                 modifier = Modifier
                     .weight(1f)

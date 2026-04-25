@@ -5,11 +5,12 @@ import com.google.firebase.Firebase
 import com.google.firebase.ai.ai
 import com.seniorproject.cupboardly.viewModels.IngredientWithQuantity
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 
+// set up Gemini service
 object GeminiService {
 
+    // using 2.5-flash-lite
     private val generativeModel =
         Firebase.ai.generativeModel(modelName = "gemini-2.5-flash-lite")
 
@@ -30,9 +31,7 @@ object GeminiService {
     }
 }
 
-/* -------------------------------------------------------
-   JSON PARSER
-------------------------------------------------------- */
+// JSON parser function
 private val json = Json {
     ignoreUnknownKeys = true
     isLenient = true
@@ -46,9 +45,7 @@ private fun cleanJson(raw: String): String {
         .trim()
 }
 
-/* -------------------------------------------------------
-   TEMP MODELS
-------------------------------------------------------- */
+// Temp models for storing parsed data
 
 @Serializable
 data class AiRecipe(
@@ -64,9 +61,7 @@ data class AiIngredient(
     val unit: String? = null
 )
 
-/* -------------------------------------------------------
-   DENSITY
-------------------------------------------------------- */
+// prompt Gemini for ingredient density
 suspend fun askGeminiForDensity(ingredient: String): Double {
 
     val prompt = """
@@ -81,9 +76,7 @@ suspend fun askGeminiForDensity(ingredient: String): Double {
     return response?.toDoubleOrNull() ?: 1.0
 }
 
-/* -------------------------------------------------------
-   MAIN RECIPE PARSE
-------------------------------------------------------- */
+// prompt Gemini to parse raw recipe text into JSON format
 suspend fun askGeminiForRecipeParse(
     text: String,
     ingredientList: List<IngredientWithQuantity>
